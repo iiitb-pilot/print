@@ -1,10 +1,6 @@
 package io.mosip.print.service.impl;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URI;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
@@ -26,6 +22,8 @@ import java.util.UUID;
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 
+import io.mosip.print.activemq.ActiveMQListener;
+import io.mosip.print.dto.*;
 import org.apache.commons.codec.binary.Base64;
 import org.joda.time.DateTime;
 import org.json.simple.JSONArray;
@@ -37,6 +35,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.JsonParseException;
@@ -57,12 +57,6 @@ import io.mosip.print.constant.PlatformSuccessMessages;
 import io.mosip.print.constant.QrVersion;
 import io.mosip.print.constant.UinCardType;
 import io.mosip.print.core.http.RequestWrapper;
-import io.mosip.print.dto.CryptoWithPinRequestDto;
-import io.mosip.print.dto.CryptoWithPinResponseDto;
-import io.mosip.print.dto.DataShare;
-import io.mosip.print.dto.JsonValue;
-import io.mosip.print.dto.VidRequestDto;
-import io.mosip.print.dto.VidResponseDTO;
 import io.mosip.print.exception.ApiNotAccessibleException;
 import io.mosip.print.exception.ApisResourceAccessException;
 import io.mosip.print.exception.CryptoManagerException;
@@ -224,6 +218,9 @@ public class PrintServiceImpl implements PrintService{
 	@Value("${mosip.datashare.policy.id}")
 	private String policyId;
 
+	@Autowired
+	ActiveMQListener activeMQListener;
+
 	public byte[] generateCard(EventModel eventModel) throws Exception {
 		Map<String, byte[]> byteMap = new HashMap<>();
 		String decodedCrdential = null;
@@ -331,8 +328,8 @@ public class PrintServiceImpl implements PrintService{
 			}
 			pdfbytes = uinCardGenerator.generateUinCard(uinArtifact, UinCardType.PDF, password);
 
-		}
-			printStatusUpdate(requestId, pdfbytes, credentialType);
+			}
+			printStatusUpdate(requestId, Base64.encodeBase64(pdfbytes), credentialType, uin);
 			isTransactionSuccessful = true;
 
 		} catch (VidCreationException e) {
@@ -870,10 +867,16 @@ public class PrintServiceImpl implements PrintService{
 		return credentialSubject;
 	}
 
-	private void printStatusUpdate(String requestId, byte[] data, String credentialType)
+	private void printStatusUpdate(String requestId, byte[] data, String credentialType, String uin)
 			throws DataShareException, ApiNotAccessibleException, IOException, Exception {
 		DataShare dataShare = null;
 		dataShare = dataShareUtil.getDataShare(data, policyId, partnerId);
+
+		// Sending DataShare URL to ActiveMQ
+		PrintMQData response = new PrintMQData("mosip.print.pdf.data", uin, dataShare.getUrl());
+		ResponseEntity<Object> entity = new ResponseEntity(response, HttpStatus.OK);
+		activeMQListener.sendToQueue(entity, 1);
+
 		CredentialStatusEvent creEvent = new CredentialStatusEvent();
 		LocalDateTime currentDtime = DateUtils.getUTCCurrentDateTime();
 		StatusEvent sEvent = new StatusEvent();
