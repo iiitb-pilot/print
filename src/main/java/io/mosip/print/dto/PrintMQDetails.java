@@ -12,10 +12,7 @@ public class PrintMQDetails {
     private String brokerUrl;
     private String inboundQueueName;
     private String outboundQueueName;
-    private String pingInboundQueueName;
-    private String pingOutboundQueueName;
     private String userName;
     private String password;
     private String typeOfQueue;
-    private String inboundMessageTTL;
 }

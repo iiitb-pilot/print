@@ -49,7 +49,7 @@ public class ActiveMQListener {
 	@Value("${print.activemq.listener.json}")
 	private String printActiveMQListenerJson;
 	
-	@Value("${print.activemq.response.delay}")
+	@Value("${print.activemq.response.delay:0}")
 	private int delayResponse;
 
 	/** The Constant PRINTMQ. */
@@ -84,29 +84,7 @@ public class ActiveMQListener {
 
 	private ActiveMQConnectionFactory activeMQConnectionFactory;
 
-//	private static final String ABIS_INSERT = "mosip.abis.insert";
-
-//	private static final String ABIS_IDENTIFY = "mosip.abis.identify";
-
-//	private static final String ABIS_DELETE = "mosip.abis.delete";
-
 	private static final String ID = "id";
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//	private static final String VALUE = "value";
 
 	private Connection connection;
 	private Session session;
@@ -116,7 +94,7 @@ public class ActiveMQListener {
 	 * This flag is added for development & debugging locally registration-processor-abis-sample.json
 	 * If true then registration-processor-abis-sample.json will be picked from resources
 	 */
-	@Value("${local.development}")
+	@Value("${local.development:false}")
 	private boolean localDevelopment;
 
 	public String outBoundQueue;
