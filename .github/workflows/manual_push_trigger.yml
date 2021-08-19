@@ -50,6 +50,10 @@ jobs:
       run: |
         mvn clean install -U -s $GITHUB_WORKSPACE/settings.xml -DskipTests -Dgpg.skip=true --file pom.xml
 
+    - name: Removing target jars
+      run: |
+        rm -rf $(find -name '*.jar' ! -executable -type f)
+
     - name: Build image
       run: |
         cd "./${{env.SERVICE_LOCATION}}"
