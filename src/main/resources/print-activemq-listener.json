@@ -1,11 +1,12 @@
 {
     "printMQ": [{
         "name": "PRINT LISTENER",
-        "brokerUrl": "tcp://https://api-internal.iiitb.mosip.net:61616",
+        "brokerUrl": "tcp://activemq-activemq-artemis.activemq:61616",
         "inboundQueueName": "",
         "outboundQueueName": "print-to-listener",
-        "userName": "admin",
-        "password": "{cipher}3c7b6d545f11105e9a9a7e1d4dfd7829662d73c713576a877536ac783921c9f0",
-        "typeOfQueue": "ACTIVEMQ"
+        "userName": "artemis",
+        "password": "MkqCuWUOfB",
+        "typeOfQueue": "ACTIVEMQ",
+        "inboundMessageTTL": 2700
     }]
 }
