@@ -1,7 +1,7 @@
 {
     "printMQ": [{
         "name": "PRINT LISTENER",
-        "brokerUrl": "tcp://https://api-internal.iiitb.mosip.netq:61616",
+        "brokerUrl": "tcp://https://api-internal.iiitb.mosip.net:61616",
         "inboundQueueName": "",
         "outboundQueueName": "print-to-listener",
         "userName": "admin",
