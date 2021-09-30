@@ -1,11 +1,11 @@
 {
     "printMQ": [{
         "name": "PRINT LISTENER",
-        "brokerUrl": "tcp://activemq.iiitb.mosip.net:61616",
+        "brokerUrl": "tcp://${activemq.host}:${activemq.core.port}",
         "inboundQueueName": "",
         "outboundQueueName": "print-to-listener",
         "userName": "artemis",
-        "password": "MkqCuWUOfB",
+        "password": "${activemq.password}",
         "typeOfQueue": "ACTIVEMQ"
     }]
 }
