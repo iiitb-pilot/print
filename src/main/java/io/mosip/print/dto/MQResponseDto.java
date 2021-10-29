@@ -2,12 +2,14 @@ package io.mosip.print.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 @Data
+@Getter
+@Setter
 @AllArgsConstructor
-public class PrintMQData {
+public class MQResponseDto {
     private String id;
-    private String refId;
-    private String printId;
-    private String data;
+    private PrintStatusRequestDto data;
 }

@@ -35,7 +35,7 @@ public class PrintPDFApplication {
 
 	public static void main(String[] args) {
 		ConfigurableApplicationContext configurableApplicationContext = SpringApplication.run(PrintPDFApplication.class, args);
-		configurableApplicationContext.getBean(ActiveMQListener.class).connectActiveMQ();
+		configurableApplicationContext.getBean(ActiveMQListener.class).runQueue();
 	}
 
 }

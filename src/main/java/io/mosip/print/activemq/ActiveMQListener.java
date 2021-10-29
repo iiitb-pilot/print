@@ -20,7 +20,10 @@ import javax.jms.Session;
 import javax.jms.TextMessage;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import io.mosip.print.dto.MQResponseDto;
 import io.mosip.print.dto.PrintMQDetails;
+import io.mosip.print.dto.PrintStatusRequestDto;
+import io.mosip.print.service.impl.PrintServiceImpl;
 import io.mosip.print.util.Helpers;
 import org.apache.activemq.ActiveMQConnection;
 import org.apache.activemq.ActiveMQConnectionFactory;
@@ -29,6 +32,7 @@ import org.apache.activemq.command.ActiveMQTextMessage;
 import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -99,6 +103,11 @@ public class ActiveMQListener {
 
 	public String outBoundQueue;
 
+	private static final String PRINT_RESPONSE = "mosip.print.pdf.response";
+
+	@Autowired
+	PrintServiceImpl printServiceImpl;
+
 	public void consumeLogic(javax.jms.Message message, String abismiddlewareaddress) {
 		Integer textType = 0;
 		String messageData = null;
@@ -116,7 +125,7 @@ public class ActiveMQListener {
 				return ;
 			}
 			logger.info("Message Data " + messageData);
-			Map map = new Gson().fromJson(messageData, Map.class);
+			MQResponseDto mqResponseDto = new Gson().fromJson(messageData, MQResponseDto.class);
 			final ObjectMapper mapper = new ObjectMapper();
 			mapper.findAndRegisterModules();
 			mapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
@@ -126,14 +135,12 @@ public class ActiveMQListener {
 			logger.info("go on sleep {} ", delayResponse);
 			TimeUnit.SECONDS.sleep(delayResponse);
 
-			logger.info("Request type is " + map.get("id"));
+			logger.info("Request type is " + mqResponseDto.getId());
 
-			switch (map.get(ID).toString()) {
-			//TODO Write ActiveMQ Input Logic Here. In Print Service Only Outbound Business Logic Required
-//			case ABIS_INSERT:
-//				final InsertRequestMO ie = mapper.convertValue(map, InsertRequestMO.class);
-//				proxycontroller.saveInsertRequestThroughListner(ie, textType);
-//				break;
+			switch (mqResponseDto.getId().toString()) {
+			case PRINT_RESPONSE:
+				printServiceImpl.updatePrintTransactionStatus(mqResponseDto.getData());
+				break;
 			}
 		} catch (Exception e) {
 			logger.error("Issue while hitting mock abis API", e.getMessage());
@@ -231,7 +238,7 @@ public class ActiveMQListener {
 		}
 	}
 
-	public void runAbisQueue() {
+	public void runQueue() {
 		try {
 			List<PrintMQDetails> printQueueDetails = getQueueDetails();
 			if (printQueueDetails != null && printQueueDetails.size() > 0) {

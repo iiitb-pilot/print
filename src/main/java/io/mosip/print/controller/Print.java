@@ -1,5 +1,9 @@
 package io.mosip.print.controller;
 
+import io.mosip.print.dto.BaseRequestDTO;
+import io.mosip.print.dto.BaseResponseDTO;
+import io.mosip.print.dto.PrintStatusRequestDto;
+import io.mosip.print.dto.TokenRequestDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -30,10 +34,7 @@ public class Print {
 	/**
 	 * Gets the file.
 	 *
-	 * @param printRequest the print request DTO
-	 * @param token        the token
-	 * @param errors       the errors
-	 * @param printRequest the print request DTO
+	 * @param eventModel the print request DTO
 	 * @return the file
 	 * @throws Exception
 	 * @throws RegPrintAppException the reg print app exception
@@ -45,4 +46,17 @@ public class Print {
 		return new ResponseEntity<>("successfully printed", HttpStatus.OK);
 	}
 
+	/**
+	 * Update Print Transaction Status.
+	 *
+	 * @param requestModel the print request DTO
+	 * @return the file
+	 * @throws Exception
+	 * @throws RegPrintAppException the reg print app exception
+	 */
+	@PostMapping(path = "/printtransaction/status", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<BaseResponseDTO> updatePrintTransactionStatus(@RequestBody BaseRequestDTO<PrintStatusRequestDto> requestModel) throws Exception {
+		BaseResponseDTO baseResponseDTO = printService.updatePrintTransactionStatus(requestModel.getRequest());
+		return ResponseEntity.ok(baseResponseDTO);
+	}
 }
