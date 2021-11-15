@@ -205,6 +205,10 @@ public class PrintServiceImpl implements PrintService{
 
 	@Value("${token.request.clientId}")
 	private String clientId;
+
+	@Value("${mosip.idencode.event.topic}")
+	private String idenCodeTopic;
+
 	@Autowired
 	ActiveMQListener activeMQListener;
 
@@ -213,6 +217,7 @@ public class PrintServiceImpl implements PrintService{
 	PrintTransactionRepository printTransactionRepository;
 
 	public byte[] generateCard(EventModel eventModel) throws Exception {
+		passEventToIdencodeService(eventModel);
 		Map<String, byte[]> byteMap = new HashMap<>();
 		String decodedCrdential = null;
 		String credential = null;
@@ -1010,6 +1015,13 @@ public class PrintServiceImpl implements PrintService{
 			}
 		}
 		return responseDto;
+	}
+
+	private void passEventToIdencodeService(EventModel eventModel) {
+		LocalDateTime currentDtime = DateUtils.getUTCCurrentDateTime();
+		eventModel.setPublishedOn(new DateTime().toString());
+		eventModel.setTopic(idenCodeTopic);
+		webSubSubscriptionHelper.publishIdencodeEvent(idenCodeTopic, eventModel);
 	}
 }
 	

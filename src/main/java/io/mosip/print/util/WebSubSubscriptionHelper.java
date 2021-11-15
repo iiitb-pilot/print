@@ -1,5 +1,6 @@
 package io.mosip.print.util;
 
+import io.mosip.print.model.EventModel;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,8 +36,11 @@ public class WebSubSubscriptionHelper {
 	@Value("${mosip.event.topic}")
 	private String topic;
 
+	@Value("${mosip.idencode.event.topic}")
+	private String idenCodeTopic;
+
 	@Autowired
-	private PublisherClient<String, CredentialStatusEvent, HttpHeaders> pb;
+	private PublisherClient<String, Object, HttpHeaders> pb;
 
 	/** The Constant BIOMETRICS. */
 	private static final String WEBSUBSUBSCRIPTIONHEPLER = "WebSubSubscriptionHelper";
@@ -50,6 +54,7 @@ public class WebSubSubscriptionHelper {
 		LOGGER.info(LoggerFileConstant.SESSIONID.toString(), WEBSUBSUBSCRIPTIONHEPLER, INITSUBSCRIPTION,
 				"Initializing subscribptions..");
 		registerTopic(topic);
+		registerTopic(idenCodeTopic);
 		subscribeForPrintServiceEvents();
 	}
 
@@ -73,10 +78,22 @@ public class WebSubSubscriptionHelper {
 		registerTopic(topic);
 		pb.publishUpdate(topic, credentialStatusEvent, MediaType.APPLICATION_JSON_UTF8_VALUE, headers,
 				webSubHubUrl + "/publish");
-	} catch (WebSubClientException e) {
-		LOGGER.info(LoggerFileConstant.SESSIONID.toString(), WEBSUBSUBSCRIPTIONHEPLER, INITSUBSCRIPTION,
-				"websub publish update error");
+		} catch (WebSubClientException e) {
+			LOGGER.info(LoggerFileConstant.SESSIONID.toString(), WEBSUBSUBSCRIPTIONHEPLER, INITSUBSCRIPTION,
+					"websub publish update error");
+		}
 	}
+
+	public void publishIdencodeEvent(String topic, EventModel eventModel) {
+		try {
+			HttpHeaders headers = new HttpHeaders();
+			registerTopic(topic);
+			pb.publishUpdate(topic, eventModel, MediaType.APPLICATION_JSON_UTF8_VALUE, headers,
+					webSubHubUrl + "/publish");
+		} catch (WebSubClientException e) {
+			LOGGER.info(LoggerFileConstant.SESSIONID.toString(), WEBSUBSUBSCRIPTIONHEPLER, INITSUBSCRIPTION,
+					"websub publish error" + e.getErrorCode() + " : " + e.getMessage());
+		}
 
 	}
 
