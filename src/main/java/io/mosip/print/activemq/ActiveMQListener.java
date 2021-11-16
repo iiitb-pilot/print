@@ -167,7 +167,6 @@ public class ActiveMQListener {
 		} else {
 			RestTemplate restTemplate = new RestTemplate();
 			logger.info("Json URL ",configServerFileStorageURL,uri);
-			System.out.println("Json URL " + configServerFileStorageURL +uri);
 			return restTemplate.getForObject(configServerFileStorageURL + uri, String.class);
 		}
 	}
