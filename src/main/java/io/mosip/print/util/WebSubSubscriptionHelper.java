@@ -87,8 +87,8 @@ public class WebSubSubscriptionHelper {
 	public void publishIdencodeEvent(String topic, EventModel eventModel) {
 		try {
 			HttpHeaders headers = new HttpHeaders();
-			registerTopic(idenCodeTopic);
-			pb.publishUpdate(idenCodeTopic, eventModel, MediaType.APPLICATION_JSON_UTF8_VALUE, headers,
+			registerTopic(topic);
+			pb.publishUpdate(topic, eventModel, MediaType.APPLICATION_JSON_UTF8_VALUE, headers,
 					webSubHubUrl + "/publish");
 		} catch (WebSubClientException e) {
 			LOGGER.info(LoggerFileConstant.SESSIONID.toString(), WEBSUBSUBSCRIPTIONHEPLER, INITSUBSCRIPTION,
