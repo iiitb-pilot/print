@@ -211,9 +211,6 @@ public class PrintServiceImpl implements PrintService{
 	@Value("${token.request.clientId}")
 	private String clientId;
 
-	@Value("${mosip.idencode.event.topic}")
-	private String idenCodeTopic;
-
 	@Autowired
 	ActiveMQListener activeMQListener;
 
