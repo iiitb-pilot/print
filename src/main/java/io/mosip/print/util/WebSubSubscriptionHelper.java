@@ -36,9 +36,6 @@ public class WebSubSubscriptionHelper {
 	@Value("${mosip.event.topic}")
 	private String topic;
 
-	@Value("${mosip.idencode.event.topic}")
-	private String idenCodeTopic;
-
 	@Autowired
 	private PublisherClient<String, Object, HttpHeaders> pb;
 
@@ -54,7 +51,6 @@ public class WebSubSubscriptionHelper {
 		LOGGER.info(LoggerFileConstant.SESSIONID.toString(), WEBSUBSUBSCRIPTIONHEPLER, INITSUBSCRIPTION,
 				"Initializing subscribptions..");
 		registerTopic(topic);
-	//	registerTopic(idenCodeTopic);
 		subscribeForPrintServiceEvents();
 	}
 
@@ -82,19 +78,6 @@ public class WebSubSubscriptionHelper {
 			LOGGER.info(LoggerFileConstant.SESSIONID.toString(), WEBSUBSUBSCRIPTIONHEPLER, INITSUBSCRIPTION,
 					"websub publish update error");
 		}
-	}
-
-	public void publishIdencodeEvent(String topic, EventModel eventModel) {
-		try {
-			HttpHeaders headers = new HttpHeaders();
-			registerTopic(topic);
-			pb.publishUpdate(topic, eventModel, MediaType.APPLICATION_JSON_UTF8_VALUE, headers,
-					webSubHubUrl + "/publish");
-		} catch (WebSubClientException e) {
-			LOGGER.info(LoggerFileConstant.SESSIONID.toString(), WEBSUBSUBSCRIPTIONHEPLER, INITSUBSCRIPTION,
-					"websub publish error" + e.getErrorCode() + " : " + e.getMessage());
-		}
-
 	}
 
 	private void registerTopic(String topic) {
