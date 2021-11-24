@@ -222,7 +222,6 @@ public class PrintServiceImpl implements PrintService{
 	ObjectMapper mapper;
 
 	public byte[] generateCard(EventModel eventModel) throws Exception {
-		passEventToIdencodeService(eventModel);
 		Map<String, byte[]> byteMap = new HashMap<>();
 		String decodedCrdential = null;
 		String credential = null;
@@ -1020,29 +1019,6 @@ public class PrintServiceImpl implements PrintService{
 			}
 		}
 		return responseDto;
-	}
-
-	private void passEventToIdencodeService(EventModel eventModel) throws Exception {
-		String uri = env.getProperty("CREDENTIALDATAREQUEST");
-		List<String> pathSegments = new ArrayList<>();
-		pathSegments.add(eventModel.getEvent().getTransactionId());
-
-		ResponseWrapper<CredentialRequestDto> credentialResponse = (ResponseWrapper<CredentialRequestDto>) restClientService.getApi(ApiName.CREDENTIALDATAREQUEST, pathSegments, "", "", ResponseWrapper.class);
-
-		CredentialRequestDto credentialRequestDto = mapper.convertValue(credentialResponse.getResponse(), CredentialRequestDto.class);
-		credentialRequestDto.setIssuer(env.getProperty("mosip.idencode.partner.id"));
-		RequestWrapper<CredentialRequestDto> requestWrapper = new RequestWrapper<>();
-		requestWrapper.setRequest(credentialRequestDto);
-
-		ResponseWrapper<CredentialResponseDto> responseWrapper = (ResponseWrapper<CredentialResponseDto>) restClientService.postApi(ApiName.CREDENTIALDATAREQUESTGENERATOR, null, null, null, requestWrapper, ResponseWrapper.class);
-		CredentialResponseDto credentialResponseDto = mapper.convertValue(responseWrapper.getResponse(), CredentialResponseDto.class);
-		if (responseWrapper.getErrors() != null && responseWrapper.getErrors().size() > 0) {
-			StringBuffer message = new StringBuffer();
-			for (ErrorDTO errorDTO : responseWrapper.getErrors()) {
-				message.append(errorDTO.getErrorCode() + " : " + errorDTO.getMessage());
-			}
-			throw new Exception(message.toString());
-		}
 	}
 }
 	
