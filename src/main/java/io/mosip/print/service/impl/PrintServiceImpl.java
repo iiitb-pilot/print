@@ -249,7 +249,7 @@ public class PrintServiceImpl implements PrintService{
 		byte[] pdfbytes = getDocuments(decodedCrdential,
 				eventModel.getEvent().getData().get("credentialType").toString(), ecryptionPin,
 				eventModel.getEvent().getTransactionId(), getSignature(sign, credential), "UIN", false, eventModel.getEvent().getId(),
-				eventModel.getEvent().getData().get("registrationId").toString()).get("uinPdf");
+				eventModel.getEvent().getData().get("registrationId").toString(), eventModel.getEvent().getData().get("vid").toString()).get("uinPdf");
 		return pdfbytes;
 	}
 
@@ -273,7 +273,7 @@ public class PrintServiceImpl implements PrintService{
 	private Map<String, byte[]> getDocuments(String credential, String credentialType, String encryptionPin,
 			String requestId, String sign,
 			String cardType,
-			boolean isPasswordProtected, String refId, String registrationId) {
+			boolean isPasswordProtected, String refId, String registrationId, String vid) {
 		printLogger.debug(LoggerFileConstant.SESSIONID.toString(), LoggerFileConstant.REGISTRATIONID.toString(),
 				"PrintServiceImpl::getDocuments()::entry");
 
@@ -282,7 +282,6 @@ public class PrintServiceImpl implements PrintService{
 		Map<String, byte[]> byteMap = new HashMap<>();
 		String uin = null;
 		LogDescription description = new LogDescription();
-		String vid = null;
 		String password = null;
 		String individualBio = null;
 		Map<String, Object> attributes = new LinkedHashMap<>();
@@ -317,6 +316,7 @@ public class PrintServiceImpl implements PrintService{
 			}
 			setTemplateAttributes(decryptedJson.toString(), attributes);
 			attributes.put(IdType.UIN.toString(), uin);
+			attributes.put(IdType.VID.toString(), vid);
 
 			byte[] textFileByte = createTextFile(decryptedJson.toString());
 			byteMap.put(UIN_TEXT_FILE, textFileByte);
