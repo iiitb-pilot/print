@@ -24,3 +24,7 @@ The template used for printing is present in the master data. You can alter that
 RPR_UIN_CARD_TEMPLATE
 ```
 To understand the PDF implementation better you can look at the PrintServiceImpl.java file. 
+
+## Developer Instructions
+Please refer the below Confluence page for Development instruction
+https://mosip.atlassian.net/wiki/spaces/~608023900/pages/741965957/Print+Service+-+Intellij+-+Local+Setup
