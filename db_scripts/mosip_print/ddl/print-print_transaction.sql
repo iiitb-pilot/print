@@ -30,8 +30,7 @@ CREATE TABLE IF NOT EXISTS print.print_transaction (
     is_deleted boolean DEFAULT false,
     del_dtimes timestamp,
     CONSTRAINT pk_printtrn_id PRIMARY KEY (print_id, lang_code)
-)
-
+);
 -- ddl-end --
 COMMENT ON TABLE print.print_transaction IS 'Print Transaction: Print Transaction list table, Store all the transaction which are sent to ActiveMQ for print';
 -- ddl-end --
