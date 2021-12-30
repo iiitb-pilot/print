@@ -1,3 +1,3 @@
-\c mosip_print sysadmin
+\c mosip_print
 
 \ir ddl/print-print_transaction.sql

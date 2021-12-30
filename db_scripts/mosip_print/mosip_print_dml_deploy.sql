@@ -1,4 +1,4 @@
-\c mosip_print sysadmin
+\c mosip_print
 
 \set CSVDataPath '\'/home/dbadmin/mosip_print/'
 
