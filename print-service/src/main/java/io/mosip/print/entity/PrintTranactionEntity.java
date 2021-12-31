@@ -24,7 +24,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @Getter
 @Setter
-@Table(name = "print_transaction", schema = "regprc")
+@Table(name = "print_transaction", schema = "print")
 public class PrintTranactionEntity implements Serializable {
     /**
      * The Print Id.
