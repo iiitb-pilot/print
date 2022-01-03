@@ -994,7 +994,7 @@ public class PrintServiceImpl implements PrintService{
 				} else {
 					PrintTranactionEntity entity = optional.get();
 
-					if (PrintTransactionStatus.PRINTED.equals(request.getPrintStatus())) {
+					if (PrintTransactionStatus.PRINTED.equals(request.getPrintStatus()) || PrintTransactionStatus.SAVED_IN_LOCAL.equals(request.getPrintStatus())) {
 						entity.setPrintDate(DateUtils.parseUTCToLocalDateTime(request.getProcessedTime()));
 					} else if (PrintTransactionStatus.SENT_FOR_PRINTING.equals(request.getPrintStatus())) {
 						entity.setReadDate(DateUtils.parseUTCToLocalDateTime(request.getProcessedTime()));
