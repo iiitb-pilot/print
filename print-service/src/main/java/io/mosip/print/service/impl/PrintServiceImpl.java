@@ -1,27 +1,30 @@
 package io.mosip.print.service.impl;
 
-import java.io.*;
-import java.net.URI;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
-
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
-
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.mosip.kernel.core.exception.ServiceError;
-import io.mosip.print.activemq.ActiveMQListener;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import io.mosip.kernel.core.websub.spi.PublisherClient;
+import io.mosip.print.activemq.PrintMQListener;
 import io.mosip.print.constant.*;
-import io.mosip.print.core.http.ResponseWrapper;
+import io.mosip.print.core.http.RequestWrapper;
 import io.mosip.print.dto.*;
 import io.mosip.print.entity.PrintTranactionEntity;
+import io.mosip.print.exception.*;
+import io.mosip.print.idrepo.dto.IdResponseDTO1;
+import io.mosip.print.logger.LogDescription;
+import io.mosip.print.logger.PrintLogger;
+import io.mosip.print.model.CredentialStatusEvent;
+import io.mosip.print.model.EventModel;
+import io.mosip.print.model.StatusEvent;
 import io.mosip.print.repository.PrintTransactionRepository;
+import io.mosip.print.service.PrintRestClientService;
+import io.mosip.print.service.PrintService;
+import io.mosip.print.service.UinCardGenerator;
+import io.mosip.print.spi.CbeffUtil;
+import io.mosip.print.spi.QrCodeGenerator;
+import io.mosip.print.util.*;
 import org.apache.commons.codec.binary.Base64;
 import org.joda.time.DateTime;
 import org.json.simple.JSONArray;
@@ -35,56 +38,21 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
-import io.mosip.kernel.core.websub.spi.PublisherClient;
-import io.mosip.print.core.http.RequestWrapper;
-import io.mosip.print.exception.ApiNotAccessibleException;
-import io.mosip.print.exception.ApisResourceAccessException;
-import io.mosip.print.exception.CryptoManagerException;
-import io.mosip.print.exception.DataShareException;
-import io.mosip.print.exception.ExceptionUtils;
-import io.mosip.print.exception.IdRepoAppException;
-import io.mosip.print.exception.IdentityNotFoundException;
-import io.mosip.print.exception.PDFGeneratorException;
-import io.mosip.print.exception.PDFSignatureException;
-import io.mosip.print.exception.ParsingException;
-import io.mosip.print.exception.PlatformErrorMessages;
-import io.mosip.print.exception.QrcodeGenerationException;
-import io.mosip.print.exception.TemplateProcessingFailureException;
-import io.mosip.print.exception.UINNotFoundInDatabase;
-import io.mosip.print.exception.VidCreationException;
-import io.mosip.print.idrepo.dto.IdResponseDTO1;
-import io.mosip.print.logger.LogDescription;
-import io.mosip.print.logger.PrintLogger;
-import io.mosip.print.model.CredentialStatusEvent;
-import io.mosip.print.model.EventModel;
-import io.mosip.print.model.StatusEvent;
-import io.mosip.print.service.PrintRestClientService;
-import io.mosip.print.service.PrintService;
-import io.mosip.print.service.UinCardGenerator;
-import io.mosip.print.spi.CbeffUtil;
-import io.mosip.print.spi.QrCodeGenerator;
-import io.mosip.print.util.AuditLogRequestBuilder;
-import io.mosip.print.util.CbeffToBiometricUtil;
-import io.mosip.print.util.CryptoCoreUtil;
-import io.mosip.print.util.CryptoUtil;
-import io.mosip.print.util.DataShareUtil;
-import io.mosip.print.util.DateUtils;
-import io.mosip.print.util.DigitalSignatureUtility;
-import io.mosip.print.util.JsonUtil;
-import io.mosip.print.util.RestApiClient;
-import io.mosip.print.util.TemplateGenerator;
-import io.mosip.print.util.Utilities;
-import io.mosip.print.util.WebSubSubscriptionHelper;
-import org.springframework.web.util.UriComponentsBuilder;
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import java.io.*;
+import java.net.URI;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 
 @Service
 public class PrintServiceImpl implements PrintService{
@@ -208,11 +176,20 @@ public class PrintServiceImpl implements PrintService{
 	@Value("${mosip.datashare.policy.id}")
 	private String policyId;
 
+	@Value("${mosip.datashare.cardprint.partner.id}")
+	private String cardPrintPartnerId;
+
+	@Value("${mosip.datashare.cardprint.policy.id}")
+	private String cardPrintPolicyId;
+
 	@Value("${token.request.clientId}")
 	private String clientId;
 
+	@Value("${mosip.print.card.enabled:false}")
+	private Boolean cardPrintEnabled;
+
 	@Autowired
-	ActiveMQListener activeMQListener;
+	private PrintMQListener activePrintMQListener;
 
 	@Autowired
 	@Qualifier("printTransactionRepository")
@@ -340,6 +317,12 @@ public class PrintServiceImpl implements PrintService{
 
 			}
 			printStatusUpdate(requestId, Base64.encodeBase64(pdfbytes), credentialType, uin, refId, registrationId);
+			//print attributes.
+			if (cardPrintEnabled) {
+				ObjectMapper mapper = new ObjectMapper();
+				String jsonAttributes = mapper.writeValueAsString(attributes);
+				jsonPrintStatusUpdate(requestId, Base64.encodeBase64(jsonAttributes.getBytes()), credentialType, uin, refId, registrationId);
+			}
 			isTransactionSuccessful = true;
 
 		} catch (VidCreationException e) {
@@ -877,6 +860,18 @@ public class PrintServiceImpl implements PrintService{
 		return credentialSubject;
 	}
 
+
+	private void jsonPrintStatusUpdate(String requestId, byte[] data, String credentialType, String uin, String printRefId, String registrationId)
+			throws DataShareException, ApiNotAccessibleException, IOException, Exception {
+		DataShare dataShare = null;
+		dataShare = dataShareUtil.getDataShare(data, cardPrintPolicyId, cardPrintPartnerId);
+
+		// Sending DataShare URL to ActiveMQ
+		PrintMQData response = new PrintMQData("mosip.print.json.data", registrationId, printRefId, dataShare.getUrl());
+		ResponseEntity<Object> entity = new ResponseEntity(response, HttpStatus.OK);
+		activePrintMQListener.sendToQueue(entity, 1, UinCardType.CARD);
+	}
+
 	private void printStatusUpdate(String requestId, byte[] data, String credentialType, String uin, String printRefId, String registrationId)
 			throws DataShareException, ApiNotAccessibleException, IOException, Exception {
 		DataShare dataShare = null;
@@ -885,7 +880,7 @@ public class PrintServiceImpl implements PrintService{
 		// Sending DataShare URL to ActiveMQ
 		PrintMQData response = new PrintMQData("mosip.print.pdf.data", registrationId, printRefId, dataShare.getUrl());
 		ResponseEntity<Object> entity = new ResponseEntity(response, HttpStatus.OK);
-		activeMQListener.sendToQueue(entity, 1);
+		activePrintMQListener.sendToQueue(entity, 1, null);
 
 		PrintTranactionEntity printTranactionDto = new PrintTranactionEntity();
 		printTranactionDto.setPrintId(printRefId);

@@ -12,6 +12,7 @@ public class PrintMQDetails {
     private String brokerUrl;
     private String inboundQueueName;
     private String outboundQueueName;
+    private String cardOutboundQueueName;
     private String userName;
     private String password;
     private String typeOfQueue;

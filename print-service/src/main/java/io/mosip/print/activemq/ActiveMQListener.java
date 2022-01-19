@@ -1,28 +1,12 @@
 package io.mosip.print.activemq;
 
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
-import javax.jms.BytesMessage;
-import javax.jms.Connection;
-import javax.jms.Destination;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageConsumer;
-import javax.jms.MessageListener;
-import javax.jms.MessageProducer;
-import javax.jms.Session;
-import javax.jms.TextMessage;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.google.gson.Gson;
+import io.mosip.print.constant.UinCardType;
 import io.mosip.print.dto.MQResponseDto;
 import io.mosip.print.dto.PrintMQDetails;
-import io.mosip.print.dto.PrintStatusRequestDto;
 import io.mosip.print.service.impl.PrintServiceImpl;
 import io.mosip.print.util.Helpers;
 import org.apache.activemq.ActiveMQConnection;
@@ -38,12 +22,17 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.google.gson.Gson;
+import javax.jms.*;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @Component
-public class ActiveMQListener {
+public class ActiveMQListener implements PrintMQListener {
 
 	private static final Logger logger = LoggerFactory.getLogger(ActiveMQListener.class);
 
@@ -86,6 +75,9 @@ public class ActiveMQListener {
 	/** The Constant OUTBOUNDQUEUENAME. */
 	private static final String OUTBOUNDQUEUENAME = "outboundQueueName";
 
+	/** The Constant CARDOUTBOUNDQUEUENAME. */
+	private static final String CARDOUTBOUNDQUEUENAME = "cardOutboundQueueName";
+
 	private ActiveMQConnectionFactory activeMQConnectionFactory;
 
 	private static final String ID = "id";
@@ -102,6 +94,8 @@ public class ActiveMQListener {
 	private boolean localDevelopment;
 
 	public String outBoundQueue;
+
+	public String cardOutBoundQueue;
 
 	private static final String PRINT_RESPONSE = "mosip.print.pdf.response";
 
@@ -148,16 +142,21 @@ public class ActiveMQListener {
 		}
 	}
 
-	public void sendToQueue(ResponseEntity<Object> obj, Integer textType) throws JsonProcessingException, UnsupportedEncodingException {
+	@Override
+	public void sendToQueue(ResponseEntity<Object> obj, Integer textType, UinCardType printType) throws JsonProcessingException, UnsupportedEncodingException {
+		String outBoundQueueStr = outBoundQueue;
+		if (printType != null && UinCardType.CARD.compareTo(printType) == 0) {
+			outBoundQueueStr = cardOutBoundQueue;
+		}
 		final ObjectMapper mapper = new ObjectMapper();
 		mapper.findAndRegisterModules();
 		mapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
 		logger.info("Response: ", obj.getBody().toString());
 		if (textType == 2) {
 			send(mapper.writeValueAsString(obj.getBody()).getBytes("UTF-8"),
-					outBoundQueue);
+					outBoundQueueStr);
 		} else if (textType == 1) {
-			send(mapper.writeValueAsString(obj.getBody()), outBoundQueue);
+			send(mapper.writeValueAsString(obj.getBody()), outBoundQueueStr);
 		}
 	}
 
@@ -196,6 +195,7 @@ public class ActiveMQListener {
 				String typeOfQueue = validateQueueJsonAndReturnValue(json, TYPEOFQUEUE);
 				String inboundQueueName = validateQueueJsonAndReturnValue(json, INBOUNDQUEUENAME);
 				String outboundQueueName = validateQueueJsonAndReturnValue(json, OUTBOUNDQUEUENAME);
+				String cardOutboundQueueName = validateQueueJsonAndReturnValue(json, CARDOUTBOUNDQUEUENAME);
 				String queueName = validateQueueJsonAndReturnValue(json, NAME);
 
 				this.activeMQConnectionFactory = new ActiveMQConnectionFactory(userName, password, brokerUrl);
@@ -203,6 +203,7 @@ public class ActiveMQListener {
 				queueDetail.setTypeOfQueue(typeOfQueue);
 				queueDetail.setInboundQueueName(inboundQueueName);
 				queueDetail.setOutboundQueueName(outboundQueueName);
+				queueDetail.setCardOutboundQueueName(cardOutboundQueueName);
 				queueDetail.setName(queueName);
 				queueDetailsList.add(queueDetail);
 			}
@@ -246,6 +247,7 @@ public class ActiveMQListener {
 				for (int i = 0; i < printQueueDetails.size(); i++) {
 					String outBoundAddress = printQueueDetails.get(i).getOutboundQueueName();
 					outBoundQueue = outBoundAddress;
+					cardOutBoundQueue = printQueueDetails.get(i).getCardOutboundQueueName();
 					QueueListener listener = new QueueListener() {
 
 						@Override
@@ -361,6 +363,7 @@ public class ActiveMQListener {
 				for (int i = 0; i < printQueueDetails.size(); i++) {
 					String outBoundAddress = printQueueDetails.get(i).getOutboundQueueName();
 					outBoundQueue = outBoundAddress;
+					cardOutBoundQueue = printQueueDetails.get(i).getCardOutboundQueueName();
 				}
 			} else {
 				throw new Exception("Queue Connection Not Found");
