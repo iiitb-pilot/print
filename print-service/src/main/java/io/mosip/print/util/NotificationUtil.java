@@ -7,16 +7,15 @@ import io.mosip.print.logger.PrintLogger;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.Date;
 
 @Component
@@ -27,6 +26,9 @@ public class NotificationUtil {
     @Autowired
     RestTemplate restTemplate;
 
+    @Autowired
+    RestApiClient restApiClient;
+
     @Value("${emailResourse.url}")
     private String emailResourseUrl;
 
@@ -36,7 +38,7 @@ public class NotificationUtil {
     @Value("${mosip.utc-datetime-pattern}")
     private String dateTimeFormat;
 
-    public NotificationResponseDTO emailNotification(String emailId, String fileName, byte[] attachmentFile) throws IOException {
+    public NotificationResponseDTO emailNotification(String emailId, String fileName, byte[] attachmentFile) throws Exception {
         log.info("sessionId", "idType", "id", "In emailNotification method of NotificationUtil service");
         HttpEntity<byte[]> doc = null;
         String fileText = null;
@@ -76,11 +78,13 @@ public class NotificationUtil {
         log.info("sessionId", "idType", "id",
                 "In emailNotification method of NotificationUtil service emailResourseUrl: " + emailResourseUrl);
         try {
-            resp = restTemplate.exchange(emailResourseUrl, HttpMethod.POST, httpEntity,
-                    new ParameterizedTypeReference<ResponseWrapper<NotificationResponseDTO>>() {
-                    });
-        } catch (RestClientException e) {
+//            resp = restTemplate.exchange(emailResourseUrl, HttpMethod.POST, httpEntity,
+//                    new ParameterizedTypeReference<ResponseWrapper<NotificationResponseDTO>>() {
+//                    });
+            resp = restApiClient.postApi(emailResourseUrl, MediaType.MULTIPART_FORM_DATA, httpEntity, ResponseEntity.class);
+        } catch (Exception e) {
             log.error("Error while sending pdf email.", e);
+            throw e;
         }
         NotificationResponseDTO notifierResponse = new NotificationResponseDTO();
         if (resp != null) {
@@ -94,7 +98,7 @@ public class NotificationUtil {
         return "UIN attached in PDF form.";
     }
 
-    private String getEmailSubject() throws IOException {
+    private String getEmailSubject() {
         return "UIN Attached";
     }
 
