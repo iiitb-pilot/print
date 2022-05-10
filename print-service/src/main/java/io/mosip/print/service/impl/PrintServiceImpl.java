@@ -187,7 +187,8 @@ public class PrintServiceImpl implements PrintService{
 
 	@Value("${mosip.print.card.enabled:false}")
 	private Boolean cardPrintEnabled;
-
+    @Value("${mosip.send.uin.email.attachment.enabled:false}")
+    private Boolean emailUINEnabled;
 	@Autowired
 	private PrintMQListener activePrintMQListener;
 
@@ -197,6 +198,8 @@ public class PrintServiceImpl implements PrintService{
 
 	@Autowired
 	ObjectMapper mapper;
+    @Autowired
+    private NotificationUtil notificationUtil;
 
 	public byte[] generateCard(EventModel eventModel) throws Exception {
 		Map<String, byte[]> byteMap = new HashMap<>();
@@ -257,7 +260,7 @@ public class PrintServiceImpl implements PrintService{
 
 		String credentialSubject;
 		Map<String, byte[]> byteMap = new HashMap<>();
-		String uin = null;
+        String uin = null, emailId = null;
 		LogDescription description = new LogDescription();
 		String password = null;
 		String individualBio = null;
@@ -272,6 +275,7 @@ public class PrintServiceImpl implements PrintService{
 			org.json.JSONObject credentialSubjectJson = new org.json.JSONObject(credentialSubject);
 			org.json.JSONObject decryptedJson = decryptAttribute(credentialSubjectJson, encryptionPin, credential);
 			individualBio = decryptedJson.getString("biometrics");
+            emailId = decryptedJson.getString("email");
 			String individualBiometric = new String(individualBio);
 			uin = decryptedJson.getString("UIN");
 			if (isPasswordProtected) {
@@ -316,6 +320,10 @@ public class PrintServiceImpl implements PrintService{
 			pdfbytes = uinCardGenerator.generateUinCard(uinArtifact, UinCardType.PDF, password);
 
 			}
+            // Send UIN Card Pdf to Email
+            if (emailUINEnabled) {
+                sendUINInEmail(emailId, registrationId, pdfbytes);
+            }
 			printStatusUpdate(requestId, Base64.encodeBase64(pdfbytes), credentialType, uin, refId, registrationId);
 			//print attributes.
 			if (cardPrintEnabled) {
@@ -429,6 +437,16 @@ public class PrintServiceImpl implements PrintService{
 		return byteMap;
 	}
 
+    private void sendUINInEmail(String emailId, String fileName, byte[] pdfbytes) {
+        if (pdfbytes != null) {
+            try {
+                NotificationResponseDTO responseDTO = notificationUtil.emailNotification(emailId, fileName, pdfbytes);
+                printLogger.info("UIN sent successfully via Email, server response..", responseDTO);
+            } catch (IOException e) {
+                printLogger.error("Failed to send pdf UIN via email.{}", emailId, e);
+            }
+        }
+    }
 	/**
 	 * Gets the id repo response.
 	 *

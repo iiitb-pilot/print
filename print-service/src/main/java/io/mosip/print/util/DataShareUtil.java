@@ -75,7 +75,7 @@ public class DataShareUtil {
 		if (responseObject != null && responseObject.getErrors() != null && !responseObject.getErrors().isEmpty()) {
 			ErrorDTO error = responseObject.getErrors().get(0);
 
-			throw new DataShareException();
+			throw new DataShareException(error.getMessage());
 		} else {
 
 			return responseObject.getDataShare();
