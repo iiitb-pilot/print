@@ -1,8 +1,12 @@
 package io.mosip.print.util;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mosip.kernel.core.util.DateUtils;
 import io.mosip.print.core.http.ResponseWrapper;
+import io.mosip.print.dto.ErrorDTO;
 import io.mosip.print.dto.NotificationResponseDTO;
+import io.mosip.print.exception.ApisResourceAccessException;
+import io.mosip.print.exception.NotificationException;
 import io.mosip.print.logger.PrintLogger;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,24 +14,22 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Date;
+import java.util.Map;
 
 @Component
 public class NotificationUtil {
 
-    Logger log = PrintLogger.getLogger(NotificationUtil.class);
+    private Logger log = PrintLogger.getLogger(NotificationUtil.class);
 
     @Autowired
-    RestTemplate restTemplate;
-
-    @Autowired
-    RestApiClient restApiClient;
+    private RestApiClient restApiClient;
 
     @Value("${emailResourse.url}")
     private String emailResourseUrl;
@@ -35,71 +37,69 @@ public class NotificationUtil {
     @Autowired
     private TemplateGenerator templateGenerator;
 
+    @Autowired
+    private ObjectMapper mapper;
+
     @Value("${mosip.utc-datetime-pattern}")
     private String dateTimeFormat;
+    @Value("${mosip.primary-language}")
+    private String primaryLang;
 
-    public NotificationResponseDTO emailNotification(String emailId, String fileName, byte[] attachmentFile) throws Exception {
+    private static final String UIN_CARD_EMAIL_SUB = "RPR_UIN_CARD_EMAIL_SUB";
+    private static final String UIN_CARD_EMAIL = "RPR_UIN_CARD_EMAIL";
+
+    public NotificationResponseDTO emailNotification(String emailId, String fileName, Map<String, Object> attributes,
+                                                     byte[] attachmentFile) throws Exception {
         log.info("sessionId", "idType", "id", "In emailNotification method of NotificationUtil service");
         HttpEntity<byte[]> doc = null;
         String fileText = null;
+        //Map<String, Object> attributes = new LinkedHashMap<>();
         if (attachmentFile != null) {
             LinkedMultiValueMap<String, String> pdfHeaderMap = new LinkedMultiValueMap<>();
             pdfHeaderMap.add("Content-disposition",
-                    "form-data; name=attachments; filename=" + fileName);
+                    "form-data; name=attachments; filename=" + fileName + ".pdf");
             pdfHeaderMap.add("Content-type", "application/pdf");
             doc = new HttpEntity<>(attachmentFile, pdfHeaderMap);
         }
 
-        ResponseEntity<ResponseWrapper<NotificationResponseDTO>> resp = null;
-        String mergeTemplate = null;
-//        for (KeyValuePairDto keyValuePair : acknowledgementDTO.getFullName()) {
-//            if (acknowledgementDTO.getIsBatch()) {
-//                fileText = templateUtil.getTemplate(keyValuePair.getKey(), cancelAppoinment);
-//            } else {
-//                fileText = templateUtil.getTemplate(keyValuePair.getKey(), emailAcknowledgement);
-//            }
-//
-//            String languageWiseTemplate = templateUtil.templateMerge(fileText, acknowledgementDTO);
-//            if (mergeTemplate == null) {
-//                mergeTemplate = languageWiseTemplate;
-//            } else {
-//                mergeTemplate += System.lineSeparator() + languageWiseTemplate;
-//            }
-//        }
+        ResponseWrapper<?> responseWrapper = null;
+        NotificationResponseDTO notifierResponse = new NotificationResponseDTO();
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         MultiValueMap<Object, Object> emailMap = new LinkedMultiValueMap<>();
         emailMap.add("attachments", doc);
-        emailMap.add("mailContent", getEmailContent());
-        emailMap.add("mailSubject", getEmailSubject());
+        emailMap.add("mailContent", getEmailContent(attributes));
+        emailMap.add("mailSubject", getEmailSubject(attributes));
         emailMap.add("mailTo", emailId);
         HttpEntity<MultiValueMap<Object, Object>> httpEntity = new HttpEntity<>(emailMap, headers);
         log.info("sessionId", "idType", "id",
                 "In emailNotification method of NotificationUtil service emailResourseUrl: " + emailResourseUrl);
         try {
-//            resp = restTemplate.exchange(emailResourseUrl, HttpMethod.POST, httpEntity,
-//                    new ParameterizedTypeReference<ResponseWrapper<NotificationResponseDTO>>() {
-//                    });
-            resp = restApiClient.postApi(emailResourseUrl, MediaType.MULTIPART_FORM_DATA, httpEntity, ResponseEntity.class);
+            responseWrapper = (ResponseWrapper<?>) restApiClient.postApi(emailResourseUrl,
+                    MediaType.MULTIPART_FORM_DATA, httpEntity, ResponseWrapper.class);
+            if (responseWrapper != null) {
+                if (responseWrapper.getErrors() != null && !responseWrapper.getErrors().isEmpty()) {
+                    ErrorDTO error = responseWrapper.getErrors().get(0);
+                    throw new NotificationException(error.getMessage());
+                }
+                notifierResponse = mapper.readValue(mapper.writeValueAsString(responseWrapper.getResponse()),
+                        NotificationResponseDTO.class);
+            }
         } catch (Exception e) {
             log.error("Error while sending pdf email.", e);
             throw e;
         }
-        NotificationResponseDTO notifierResponse = new NotificationResponseDTO();
-        if (resp != null) {
-            notifierResponse.setMessage(resp.getBody().getResponse().getMessage());
-            notifierResponse.setStatus(resp.getBody().getResponse().getStatus());
-        }
         return notifierResponse;
     }
 
-    private String getEmailContent() {
-        return "UIN attached in PDF form.";
+    private InputStream getEmailContent(Map<String, Object> attributes) throws IOException, ApisResourceAccessException {
+        return templateGenerator.getTemplate(UIN_CARD_EMAIL, attributes, primaryLang);
     }
 
-    private String getEmailSubject() {
-        return "UIN Attached";
+    private InputStream getEmailSubject(Map<String, Object> attributes) throws IOException, ApisResourceAccessException {
+        return templateGenerator.getTemplate(UIN_CARD_EMAIL_SUB, attributes, primaryLang);
+        //return new String(in.readAllBytes(), StandardCharsets.UTF_8);
     }
 
     private String getCurrentResponseTime() {

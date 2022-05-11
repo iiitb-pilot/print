@@ -322,7 +322,7 @@ public class PrintServiceImpl implements PrintService{
 			}
             // Send UIN Card Pdf to Email
             if (emailUINEnabled) {
-                sendUINInEmail(emailId, registrationId, pdfbytes);
+                sendUINInEmail(emailId, registrationId, attributes, pdfbytes);
             }
 			printStatusUpdate(requestId, Base64.encodeBase64(pdfbytes), credentialType, uin, refId, registrationId);
 			//print attributes.
@@ -437,10 +437,11 @@ public class PrintServiceImpl implements PrintService{
 		return byteMap;
 	}
 
-    private void sendUINInEmail(String emailId, String fileName, byte[] pdfbytes) {
+    private void sendUINInEmail(String emailId, String fileName, Map<String, Object> attributes, byte[] pdfbytes) {
         if (pdfbytes != null) {
             try {
-                NotificationResponseDTO responseDTO = notificationUtil.emailNotification(emailId, fileName, pdfbytes);
+                NotificationResponseDTO responseDTO = notificationUtil.emailNotification(emailId, fileName,
+						attributes, pdfbytes);
                 printLogger.info("UIN sent successfully via Email, server response..", responseDTO);
             } catch (Exception e) {
                 printLogger.error("Failed to send pdf UIN via email.{}", emailId, e);
