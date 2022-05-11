@@ -20,6 +20,7 @@ import org.springframework.util.MultiValueMap;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Map;
 
@@ -47,6 +48,8 @@ public class NotificationUtil {
 
     private static final String UIN_CARD_EMAIL_SUB = "RPR_UIN_CARD_EMAIL_SUB";
     private static final String UIN_CARD_EMAIL = "RPR_UIN_CARD_EMAIL";
+    private static final String UIN_CARD_EMAIL_SUB_DEFAULT = "UIN Card Attached!";
+    private static final String UIN_CARD_EMAIL_DEFAULT = "Your UIN Card is attached.";
 
     public NotificationResponseDTO emailNotification(String emailId, String fileName, Map<String, Object> attributes,
                                                      byte[] attachmentFile) throws Exception {
@@ -93,13 +96,20 @@ public class NotificationUtil {
         return notifierResponse;
     }
 
-    private InputStream getEmailContent(Map<String, Object> attributes) throws IOException, ApisResourceAccessException {
-        return templateGenerator.getTemplate(UIN_CARD_EMAIL, attributes, primaryLang);
+    private String getEmailContent(Map<String, Object> attributes) throws IOException, ApisResourceAccessException {
+        InputStream in = templateGenerator.getTemplate(UIN_CARD_EMAIL, attributes, primaryLang);
+        if (in == null) {
+            return UIN_CARD_EMAIL_DEFAULT;
+        }
+        return new String(in.readAllBytes(), StandardCharsets.UTF_8);
     }
 
-    private InputStream getEmailSubject(Map<String, Object> attributes) throws IOException, ApisResourceAccessException {
-        return templateGenerator.getTemplate(UIN_CARD_EMAIL_SUB, attributes, primaryLang);
-        //return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+    private String getEmailSubject(Map<String, Object> attributes) throws IOException, ApisResourceAccessException {
+        InputStream in = templateGenerator.getTemplate(UIN_CARD_EMAIL_SUB, attributes, primaryLang);
+        if (in == null) {
+            return UIN_CARD_EMAIL_SUB_DEFAULT;
+        }
+        return new String(in.readAllBytes(), StandardCharsets.UTF_8);
     }
 
     private String getCurrentResponseTime() {
