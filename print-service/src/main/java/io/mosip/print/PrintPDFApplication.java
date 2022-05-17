@@ -1,10 +1,12 @@
 package io.mosip.print;
 
+import io.mosip.print.activemq.ActiveMQListener;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -38,7 +40,8 @@ public class PrintPDFApplication {
 	}
 
 	public static void main(String[] args) {
-		SpringApplication.run(PrintPDFApplication.class, args);
+		ConfigurableApplicationContext configurableApplicationContext = SpringApplication.run(PrintPDFApplication.class, args);
+		configurableApplicationContext.getBean(ActiveMQListener.class).runQueue();
 	}
 
 }

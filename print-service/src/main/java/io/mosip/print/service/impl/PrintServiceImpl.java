@@ -12,25 +12,23 @@ import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import io.mosip.print.activemq.PrintMQListener;
+import io.mosip.print.constant.*;
+import io.mosip.print.dto.*;
+import io.mosip.print.entity.PrintTranactionEntity;
+import io.mosip.print.repository.PrintTransactionRepository;
+import io.mosip.print.util.*;
 import org.apache.commons.codec.binary.Base64;
 import org.joda.time.DateTime;
 import org.json.simple.JSONArray;
@@ -39,23 +37,13 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import io.mosip.print.constant.EventId;
-import io.mosip.print.constant.EventName;
-import io.mosip.print.constant.EventType;
-import io.mosip.print.constant.IdType;
-import io.mosip.print.constant.ModuleName;
-import io.mosip.print.constant.PDFGeneratorExceptionCodeConstant;
-import io.mosip.print.constant.PlatformSuccessMessages;
-import io.mosip.print.constant.QrVersion;
-import io.mosip.print.constant.UinCardType;
-import io.mosip.print.dto.CryptoWithPinRequestDto;
-import io.mosip.print.dto.CryptoWithPinResponseDto;
-import io.mosip.print.dto.DataShare;
-import io.mosip.print.dto.JsonValue;
 import io.mosip.print.exception.ApiNotAccessibleException;
 import io.mosip.print.exception.ApisResourceAccessException;
 import io.mosip.print.exception.CryptoManagerException;
@@ -79,18 +67,6 @@ import io.mosip.print.service.PrintService;
 import io.mosip.print.service.UinCardGenerator;
 import io.mosip.print.spi.CbeffUtil;
 import io.mosip.print.spi.QrCodeGenerator;
-import io.mosip.print.util.AuditLogRequestBuilder;
-import io.mosip.print.util.CbeffToBiometricUtil;
-import io.mosip.print.util.CredentialsVerifier;
-import io.mosip.print.util.CryptoCoreUtil;
-import io.mosip.print.util.CryptoUtil;
-import io.mosip.print.util.DataShareUtil;
-import io.mosip.print.util.DateUtils;
-import io.mosip.print.util.JsonUtil;
-import io.mosip.print.util.RestApiClient;
-import io.mosip.print.util.TemplateGenerator;
-import io.mosip.print.util.Utilities;
-import io.mosip.print.util.WebSubSubscriptionHelper;
 
 @Service
 public class PrintServiceImpl implements PrintService{
@@ -197,6 +173,29 @@ public class PrintServiceImpl implements PrintService{
 	@Value("${mosip.print.verify.credentials.flag:true}")
 	private boolean verifyCredentialsFlag;
 
+	@Value("${mosip.datashare.cardprint.partner.id}")
+	private String cardPrintPartnerId;
+
+	@Value("${mosip.datashare.cardprint.policy.id}")
+	private String cardPrintPolicyId;
+
+	@Value("${token.request.clientId}")
+	private String clientId;
+
+	@Value("${mosip.print.card.enabled:false}")
+	private Boolean cardPrintEnabled;
+	@Value("${mosip.send.uin.email.attachment.enabled:false}")
+	private Boolean emailUINEnabled;
+
+	@Autowired
+	private PrintMQListener activePrintMQListener;
+
+	@Autowired
+	@Qualifier("printTransactionRepository")
+	PrintTransactionRepository printTransactionRepository;
+
+	@Autowired
+	private NotificationUtil notificationUtil;
 
 	public boolean generateCard(EventModel eventModel) {
 		String credential = null;
@@ -209,6 +208,15 @@ public class PrintServiceImpl implements PrintService{
 				URI dataShareUri = URI.create(dataShareUrl);
 				credential = restApiClient.getApi(dataShareUri, String.class);
 			}
+
+		if (eventModel.getEvent().getData().get("registrationId") == null) {
+			printLogger.error(LoggerFileConstant.SESSIONID.toString(),
+					LoggerFileConstant.REGISTRATIONID.toString(), "RID" +
+							PlatformErrorMessages.PRT_RID_MISSING_EXCEPTION.name());
+			throw new IdentityNotFoundException(
+					PlatformErrorMessages.PRT_RID_MISSING_EXCEPTION.getMessage());
+		}
+
 			String ecryptionPin = eventModel.getEvent().getData().get("protectionKey").toString();
 			String decodedCredential = cryptoCoreUtil.decrypt(credential);
 			if (verifyCredentialsFlag){
@@ -224,7 +232,8 @@ public class PrintServiceImpl implements PrintService{
 			proofMap = (Map) eventModel.getEvent().getData().get("proof");
 			byte[] pdfbytes = getDocuments(decodedCredential,
 					eventModel.getEvent().getData().get("credentialType").toString(), ecryptionPin,
-					eventModel.getEvent().getTransactionId(), "UIN", false).get("uinPdf");
+					eventModel.getEvent().getTransactionId(), "UIN", false, eventModel.getEvent().getId(),
+					eventModel.getEvent().getData().get("registrationId").toString(), eventModel.getEvent().getData().get("vid").toString()).get("uinPdf");
 			isPrinted = true; 
 		}catch (Exception e){
 			printLogger.error(e.getMessage() , e);
@@ -243,7 +252,7 @@ public class PrintServiceImpl implements PrintService{
 	private Map<String, byte[]> getDocuments(String credential, String credentialType, String encryptionPin,
 			String requestId,
 			String cardType,
-			boolean isPasswordProtected) {
+			boolean isPasswordProtected, String refId, String registrationId, String vid) {
 		printLogger.debug("PrintServiceImpl::getDocuments()::entry");
 		String credentialSubject;
 		Map<String, byte[]> byteMap = new HashMap<>();
@@ -720,7 +729,7 @@ public class PrintServiceImpl implements PrintService{
 		printTranactionDto.setCrBy(env.getProperty("mosip.application.id"));
 		printTranactionDto.setStatusCode(PrintTransactionStatus.QUEUED.toString());
 		printTranactionDto.setCredentialTransactionId(requestId);
-		printTranactionDto.setLangCode(primaryLang);
+		printTranactionDto.setLangCode(templateLang);
 		printTranactionDto.setReferenceId(registrationId);
 		printTransactionRepository.create(printTranactionDto);
 		CredentialStatusEvent creEvent = new CredentialStatusEvent();

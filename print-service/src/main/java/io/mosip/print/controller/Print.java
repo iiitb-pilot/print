@@ -1,5 +1,8 @@
 package io.mosip.print.controller;
 
+import io.mosip.print.dto.BaseRequestDTO;
+import io.mosip.print.dto.BaseResponseDTO;
+import io.mosip.print.dto.PrintStatusRequestDto;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
