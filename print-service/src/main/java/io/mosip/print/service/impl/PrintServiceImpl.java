@@ -228,8 +228,6 @@ public class PrintServiceImpl implements PrintService{
 					return false;
 				}
 			}
-			Map proofMap = new HashMap<String, String>();
-			proofMap = (Map) eventModel.getEvent().getData().get("proof");
 			byte[] pdfbytes = getDocuments(decodedCredential,
 					eventModel.getEvent().getData().get("credentialType").toString(), ecryptionPin,
 					eventModel.getEvent().getTransactionId(), "UIN", false, eventModel.getEvent().getId(),
