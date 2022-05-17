@@ -50,6 +50,7 @@
 		<bouncycastle.version>1.66</bouncycastle.version>
 		<jwt.version> 3.8.1</jwt.version>
 		<google.zxing.version>3.3.3</google.zxing.version>
+		<postgresql.version>42.2.2</postgresql.version>
 	</properties>
 
 	<dependencies>
@@ -73,6 +74,10 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-configuration-processor</artifactId>
 			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-activemq</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -233,6 +238,11 @@
 			<groupId>info.weboftrust</groupId>
 			<artifactId>ld-signatures-java</artifactId>
 			<version>0.8.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<version>${postgresql.version}</version>
 		</dependency>
 	</dependencies>
 	

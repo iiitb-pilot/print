@@ -247,7 +247,7 @@ public class PrintServiceImpl implements PrintService{
 		printLogger.debug("PrintServiceImpl::getDocuments()::entry");
 		String credentialSubject;
 		Map<String, byte[]> byteMap = new HashMap<>();
-		String uin = null;
+        String uin = null, emailId = null;
 		LogDescription description = new LogDescription();
 		String password = null;
 		String individualBio = null;
@@ -261,6 +261,7 @@ public class PrintServiceImpl implements PrintService{
 			org.json.JSONObject credentialSubjectJson = new org.json.JSONObject(credentialSubject);
 			org.json.JSONObject decryptedJson = decryptAttribute(credentialSubjectJson, encryptionPin, credential);
 			individualBio = decryptedJson.getString("biometrics");
+            emailId = decryptedJson.getString("email");
 			String individualBiometric = new String(individualBio);
 			uin = decryptedJson.getString("UIN");
 			if (isPasswordProtected) {
@@ -280,6 +281,7 @@ public class PrintServiceImpl implements PrintService{
 			}
 			setTemplateAttributes(decryptedJson.toString(), attributes);
 			attributes.put(IdType.UIN.toString(), uin);
+			attributes.put(IdType.VID.toString(), vid);
 
 			byte[] textFileByte = createTextFile(decryptedJson.toString());
 			byteMap.put(UIN_TEXT_FILE, textFileByte);
@@ -298,7 +300,17 @@ public class PrintServiceImpl implements PrintService{
 			pdfbytes = uinCardGenerator.generateUinCard(uinArtifact, UinCardType.PDF, password);
 
 		}
-			printStatusUpdate(requestId, pdfbytes, credentialType);
+            // Send UIN Card Pdf to Email
+            if (emailUINEnabled) {
+                sendUINInEmail(emailId, registrationId, attributes, pdfbytes);
+            }
+			printStatusUpdate(requestId, Base64.encodeBase64(pdfbytes), credentialType, uin, refId, registrationId);
+			//print attributes.
+			if (cardPrintEnabled) {
+				ObjectMapper mapper = new ObjectMapper();
+				String jsonAttributes = mapper.writeValueAsString(attributes);
+				jsonPrintStatusUpdate(requestId, Base64.encodeBase64(jsonAttributes.getBytes()), credentialType, uin, refId, registrationId);
+			}
 			isTransactionSuccessful = true;
 
 		}
@@ -378,6 +390,17 @@ public class PrintServiceImpl implements PrintService{
 		return byteMap;
 	}
 
+    private void sendUINInEmail(String emailId, String fileName, Map<String, Object> attributes, byte[] pdfbytes) {
+        if (pdfbytes != null) {
+            try {
+                NotificationResponseDTO responseDTO = notificationUtil.emailNotification(emailId, fileName,
+						attributes, pdfbytes);
+                printLogger.info("UIN sent successfully via Email, server response..", responseDTO);
+            } catch (Exception e) {
+                printLogger.error("Failed to send pdf UIN via email.{}", emailId, e);
+            }
+        }
+    }
 	/**
 	 * Creates the text file.
 	 *
@@ -672,10 +695,34 @@ public class PrintServiceImpl implements PrintService{
 		return credentialSubject;
 	}
 
-	private void printStatusUpdate(String requestId, byte[] data, String credentialType)
+	private void jsonPrintStatusUpdate(String requestId, byte[] data, String credentialType, String uin, String printRefId, String registrationId)
+			throws DataShareException, ApiNotAccessibleException, IOException, Exception {
+		DataShare dataShare = null;
+		dataShare = dataShareUtil.getDataShare(data, cardPrintPolicyId, cardPrintPartnerId);
+
+		// Sending DataShare URL to ActiveMQ
+		PrintMQData response = new PrintMQData("mosip.print.json.data", registrationId, printRefId, dataShare.getUrl());
+		ResponseEntity<Object> entity = new ResponseEntity(response, HttpStatus.OK);
+		activePrintMQListener.sendToQueue(entity, 1, UinCardType.CARD);
+	}
+	private void printStatusUpdate(String requestId, byte[] data, String credentialType, String uin, String printRefId, String registrationId)
 			throws DataShareException, ApiNotAccessibleException, IOException, Exception {
 		DataShare dataShare = null;
 		dataShare = dataShareUtil.getDataShare(data, policyId, partnerId);
+		// Sending DataShare URL to ActiveMQ
+		PrintMQData response = new PrintMQData("mosip.print.pdf.data", registrationId, printRefId, dataShare.getUrl());
+		ResponseEntity<Object> entity = new ResponseEntity(response, HttpStatus.OK);
+		activePrintMQListener.sendToQueue(entity, 1, null);
+
+		PrintTranactionEntity printTranactionDto = new PrintTranactionEntity();
+		printTranactionDto.setPrintId(printRefId);
+		printTranactionDto.setCrDate(DateUtils.getUTCCurrentDateTime());
+		printTranactionDto.setCrBy(env.getProperty("mosip.application.id"));
+		printTranactionDto.setStatusCode(PrintTransactionStatus.QUEUED.toString());
+		printTranactionDto.setCredentialTransactionId(requestId);
+		printTranactionDto.setLangCode(primaryLang);
+		printTranactionDto.setReferenceId(registrationId);
+		printTransactionRepository.create(printTranactionDto);
 		CredentialStatusEvent creEvent = new CredentialStatusEvent();
 		LocalDateTime currentDtime = DateUtils.getUTCCurrentDateTime();
 		StatusEvent sEvent = new StatusEvent();
@@ -723,6 +770,63 @@ public class PrintServiceImpl implements PrintService{
 			}
 
 		return data;
+	}
+	@Override
+	public BaseResponseDTO updatePrintTransactionStatus(PrintStatusRequestDto request) {
+		List<Errors> errorsList = new ArrayList<Errors>();
+
+		if (request.getId()==null || request.getId().isEmpty())
+			errorsList.add(new Errors(PlatformErrorMessages.PRT_RID_MISSING_EXCEPTION.getCode(), PlatformErrorMessages.PRT_RID_MISSING_EXCEPTION.getMessage()));
+
+		if (request.getPrintStatus() == null)
+			errorsList.add(new Errors(PlatformErrorMessages.PRT_STATUS_MISSING_EXCEPTION.getCode(), PlatformErrorMessages.PRT_STATUS_MISSING_EXCEPTION.getMessage() + " Available Value : " + PrintTransactionStatus.values() ));
+
+		BaseResponseDTO responseDto = new BaseResponseDTO();
+		if(!errorsList.isEmpty()) {
+			responseDto.setErrors(errorsList);
+			responseDto.setResponse("Request has errors.");
+			responseDto.setResponsetime(Timestamp.valueOf(DateUtils.getUTCCurrentDateTime()).toString());
+			responseDto.setId(env.getProperty("mosip.application.id"));
+			responseDto.setVersion(env.getProperty("token.request.version"));
+		} else {
+			try {
+				Optional<PrintTranactionEntity> optional = printTransactionRepository.findById(request.getId());
+
+				if (optional.isEmpty()) {
+					errorsList.add(new Errors(PlatformErrorMessages.PRT_PRINT_ID_INVALID_EXCEPTION.getCode(), PlatformErrorMessages.PRT_PRINT_ID_INVALID_EXCEPTION.getMessage()));
+					responseDto.setErrors(errorsList);
+					responseDto.setResponse("Request has errors.");
+					responseDto.setResponsetime(Timestamp.valueOf(DateUtils.getUTCCurrentDateTime()).toString());
+					responseDto.setId(env.getProperty("mosip.application.id"));
+					responseDto.setVersion(env.getProperty("token.request.version"));
+				} else {
+					PrintTranactionEntity entity = optional.get();
+
+					if (PrintTransactionStatus.PRINTED.equals(request.getPrintStatus()) || PrintTransactionStatus.SAVED_IN_LOCAL.equals(request.getPrintStatus())) {
+						entity.setPrintDate(DateUtils.parseUTCToLocalDateTime(request.getProcessedTime()));
+					} else if (PrintTransactionStatus.SENT_FOR_PRINTING.equals(request.getPrintStatus())) {
+						entity.setReadDate(DateUtils.parseUTCToLocalDateTime(request.getProcessedTime()));
+					}
+					entity.setStatusCode(request.getPrintStatus().toString());
+					entity.setStatusComment(request.getStatusComments());
+					entity.setUpBy(env.getProperty("mosip.application.id"));
+					entity.setUpdDate(DateUtils.getUTCCurrentDateTime());
+					printTransactionRepository.update(entity);
+					responseDto.setResponse("Successfully Updated Print Status");
+					responseDto.setResponsetime(Timestamp.valueOf(DateUtils.getUTCCurrentDateTime()).toString());
+					responseDto.setId(env.getProperty("mosip.application.id"));
+					responseDto.setVersion(env.getProperty("token.request.version"));
+				}
+			} catch (Exception e) {
+				errorsList.add(new Errors(PlatformErrorMessages.PRT_UNKNOWN_EXCEPTION.getCode(), PlatformErrorMessages.PRT_UNKNOWN_EXCEPTION.getMessage()));
+				responseDto.setErrors(errorsList);
+				responseDto.setResponse("Service has errors. Contact System Administrator");
+				responseDto.setResponsetime(Timestamp.valueOf(DateUtils.getUTCCurrentDateTime()).toString());
+				responseDto.setId(env.getProperty("mosip.application.id"));
+				responseDto.setVersion(env.getProperty("token.request.version"));
+			}
+		}
+		return responseDto;
 	}
 }
 	
