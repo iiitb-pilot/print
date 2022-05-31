@@ -402,7 +402,7 @@ public class PrintServiceImpl implements PrintService{
             try {
                 NotificationResponseDTO responseDTO = notificationUtil.emailNotification(emailId, fileName,
 						attributes, pdfbytes);
-                printLogger.info("UIN sent successfully via Email, server response..", responseDTO);
+                printLogger.info("UIN sent successfully via Email, server response..{}", responseDTO);
             } catch (Exception e) {
                 printLogger.error("Failed to send pdf UIN via email.{}", emailId, e);
             }
