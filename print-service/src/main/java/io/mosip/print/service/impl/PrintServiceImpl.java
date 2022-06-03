@@ -495,7 +495,6 @@ public class PrintServiceImpl implements PrintService{
 		JSONObject demographicIdentity = JsonUtil.objectMapperReadValue(jsonString, JSONObject.class);
 		if (demographicIdentity == null)
 			throw new IdentityNotFoundException(PlatformErrorMessages.PRT_PIS_IDENTITY_NOT_FOUND.getMessage());
-		printLogger.info(utilities.getConfigServerFileStorageURL() + utilities.getRegistrationProcessorPrintTextFile());
 
 		String printTextFileJson = Utilities.getJson(utilities.getConfigServerFileStorageURL(),
 				utilities.getRegistrationProcessorPrintTextFile());

@@ -166,7 +166,6 @@ public class Utilities {
 	public JSONObject getRegistrationProcessorMappingJson() throws IOException {
 		printLogger.debug(LoggerFileConstant.SESSIONID.toString(), LoggerFileConstant.USERID.toString(), "",
 				"Utilities::getRegistrationProcessorMappingJson()::entry");
-		printLogger.info(configServerFileStorageURL + getRegProcessorIdentityJson);
 		mappingJsonString = (mappingJsonString != null && !mappingJsonString.isEmpty()) ?
 				mappingJsonString : Utilities.getJson(configServerFileStorageURL, getRegProcessorIdentityJson);
 		ObjectMapper mapIdentityJsonStringToObject = new ObjectMapper();
