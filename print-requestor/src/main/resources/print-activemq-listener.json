@@ -1,0 +1,13 @@
+{
+    "printMQ": [{
+        "name": "PRINT LISTENER",
+        "brokerUrl": "tcp://api-internal.mec2.mosip.net:61616",
+        "inboundQueueName": "printlistener-to-print",
+        "outboundQueueName": "print-to-printlistener",
+        "cardOutboundQueueName": "print-to-cardprintlistener",
+        "userName": "artemis",
+        "password": "2gCuugXQIZ",
+        "typeOfQueue": "ACTIVEMQ",
+        "inboundMessageTTL": 2700
+    }]
+}
