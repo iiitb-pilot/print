@@ -6,7 +6,7 @@
         "outboundQueueName": "print-to-printlistener",
         "cardOutboundQueueName": "print-to-cardprintlistener",
         "userName": "artemis",
-        "password": "2gCuugXQIZ",
+        "password": "password",
         "typeOfQueue": "ACTIVEMQ",
         "inboundMessageTTL": 2700
     }]
