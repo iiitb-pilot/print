@@ -75,9 +75,6 @@ public class ActiveMQListener implements PrintMQListener {
 	/** The Constant OUTBOUNDQUEUENAME. */
 	private static final String OUTBOUNDQUEUENAME = "outboundQueueName";
 
-	/** The Constant CARDOUTBOUNDQUEUENAME. */
-	private static final String CARDOUTBOUNDQUEUENAME = "cardOutboundQueueName";
-
 	private ActiveMQConnectionFactory activeMQConnectionFactory;
 
 	private static final String ID = "id";
@@ -94,8 +91,6 @@ public class ActiveMQListener implements PrintMQListener {
 	private boolean localDevelopment;
 
 	public String outBoundQueue;
-
-	public String cardOutBoundQueue;
 
 	private static final String PRINT_RESPONSE = "mosip.print.pdf.response";
 
@@ -145,9 +140,6 @@ public class ActiveMQListener implements PrintMQListener {
 	@Override
 	public void sendToQueue(ResponseEntity<Object> obj, Integer textType, UinCardType printType) throws JsonProcessingException, UnsupportedEncodingException {
 		String outBoundQueueStr = outBoundQueue;
-		if (printType != null && UinCardType.CARD.compareTo(printType) == 0) {
-			outBoundQueueStr = cardOutBoundQueue;
-		}
 		final ObjectMapper mapper = new ObjectMapper();
 		mapper.findAndRegisterModules();
 		mapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
@@ -195,7 +187,6 @@ public class ActiveMQListener implements PrintMQListener {
 				String typeOfQueue = validateQueueJsonAndReturnValue(json, TYPEOFQUEUE);
 				String inboundQueueName = validateQueueJsonAndReturnValue(json, INBOUNDQUEUENAME);
 				String outboundQueueName = validateQueueJsonAndReturnValue(json, OUTBOUNDQUEUENAME);
-				String cardOutboundQueueName = validateQueueJsonAndReturnValue(json, CARDOUTBOUNDQUEUENAME);
 				String queueName = validateQueueJsonAndReturnValue(json, NAME);
 
 				this.activeMQConnectionFactory = new ActiveMQConnectionFactory(userName, password, brokerUrl);
@@ -203,7 +194,6 @@ public class ActiveMQListener implements PrintMQListener {
 				queueDetail.setTypeOfQueue(typeOfQueue);
 				queueDetail.setInboundQueueName(inboundQueueName);
 				queueDetail.setOutboundQueueName(outboundQueueName);
-				queueDetail.setCardOutboundQueueName(cardOutboundQueueName);
 				queueDetail.setName(queueName);
 				queueDetailsList.add(queueDetail);
 			}
@@ -247,7 +237,6 @@ public class ActiveMQListener implements PrintMQListener {
 				for (int i = 0; i < printQueueDetails.size(); i++) {
 					String outBoundAddress = printQueueDetails.get(i).getOutboundQueueName();
 					outBoundQueue = outBoundAddress;
-					cardOutBoundQueue = printQueueDetails.get(i).getCardOutboundQueueName();
 					QueueListener listener = new QueueListener() {
 
 						@Override
@@ -363,7 +352,6 @@ public class ActiveMQListener implements PrintMQListener {
 				for (int i = 0; i < printQueueDetails.size(); i++) {
 					String outBoundAddress = printQueueDetails.get(i).getOutboundQueueName();
 					outBoundQueue = outBoundAddress;
-					cardOutBoundQueue = printQueueDetails.get(i).getCardOutboundQueueName();
 				}
 			} else {
 				throw new Exception("Queue Connection Not Found");

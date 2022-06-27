@@ -12,8 +12,5 @@ public enum UinCardType {
 	/** The text. */
 	TEXT,
 	/** The image. */
-	IMAGE,
-	/** The Card. */
-	CARD;
-
+	IMAGE
 }

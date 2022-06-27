@@ -1,33 +1,24 @@
 package io.mosip.print.service.impl;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
-import java.util.*;
-
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
-
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-
 import io.mosip.print.activemq.PrintMQListener;
 import io.mosip.print.constant.*;
 import io.mosip.print.dto.*;
 import io.mosip.print.entity.PrintTranactionEntity;
+import io.mosip.print.exception.*;
+import io.mosip.print.logger.LogDescription;
+import io.mosip.print.logger.PrintLogger;
+import io.mosip.print.model.CredentialStatusEvent;
+import io.mosip.print.model.EventModel;
+import io.mosip.print.model.StatusEvent;
 import io.mosip.print.repository.PrintTransactionRepository;
+import io.mosip.print.service.PrintService;
+import io.mosip.print.service.UinCardGenerator;
+import io.mosip.print.spi.CbeffUtil;
+import io.mosip.print.spi.QrCodeGenerator;
 import io.mosip.print.util.*;
 import org.apache.commons.codec.binary.Base64;
 import org.joda.time.DateTime;
@@ -44,29 +35,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import io.mosip.print.exception.ApiNotAccessibleException;
-import io.mosip.print.exception.ApisResourceAccessException;
-import io.mosip.print.exception.CryptoManagerException;
-import io.mosip.print.exception.DataShareException;
-import io.mosip.print.exception.ExceptionUtils;
-import io.mosip.print.exception.IdRepoAppException;
-import io.mosip.print.exception.IdentityNotFoundException;
-import io.mosip.print.exception.PDFGeneratorException;
-import io.mosip.print.exception.PDFSignatureException;
-import io.mosip.print.exception.ParsingException;
-import io.mosip.print.exception.PlatformErrorMessages;
-import io.mosip.print.exception.QrcodeGenerationException;
-import io.mosip.print.exception.TemplateProcessingFailureException;
-import io.mosip.print.exception.UINNotFoundInDatabase;
-import io.mosip.print.logger.LogDescription;
-import io.mosip.print.logger.PrintLogger;
-import io.mosip.print.model.CredentialStatusEvent;
-import io.mosip.print.model.EventModel;
-import io.mosip.print.model.StatusEvent;
-import io.mosip.print.service.PrintService;
-import io.mosip.print.service.UinCardGenerator;
-import io.mosip.print.spi.CbeffUtil;
-import io.mosip.print.spi.QrCodeGenerator;
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import java.io.*;
+import java.net.URI;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.util.*;
 
 @Service
 public class PrintServiceImpl implements PrintService{
@@ -173,17 +152,9 @@ public class PrintServiceImpl implements PrintService{
 	@Value("${mosip.print.verify.credentials.flag:true}")
 	private boolean verifyCredentialsFlag;
 
-	@Value("${mosip.datashare.cardprint.partner.id}")
-	private String cardPrintPartnerId;
-
-	@Value("${mosip.datashare.cardprint.policy.id}")
-	private String cardPrintPolicyId;
-
 	@Value("${token.request.clientId}")
 	private String clientId;
 
-	@Value("${mosip.print.card.enabled:false}")
-	private Boolean cardPrintEnabled;
 	@Value("${mosip.send.uin.email.attachment.enabled:false}")
 	private Boolean emailUINEnabled;
 
@@ -312,14 +283,7 @@ public class PrintServiceImpl implements PrintService{
                 sendUINInEmail(emailId, registrationId, attributes, pdfbytes);
             }
 			printStatusUpdate(requestId, Base64.encodeBase64(pdfbytes), credentialType, uin, refId, registrationId);
-			//print attributes.
-			if (cardPrintEnabled) {
-				ObjectMapper mapper = new ObjectMapper();
-				String jsonAttributes = mapper.writeValueAsString(attributes);
-				jsonPrintStatusUpdate(requestId, Base64.encodeBase64(jsonAttributes.getBytes()), credentialType, uin, refId, registrationId);
-			}
 			isTransactionSuccessful = true;
-
 		}
 		catch (QrcodeGenerationException e) {
 			description.setMessage(PlatformErrorMessages.PRT_PRT_QR_CODE_GENERATION_ERROR.getMessage());
@@ -702,16 +666,6 @@ public class PrintServiceImpl implements PrintService{
 		return credentialSubject;
 	}
 
-	private void jsonPrintStatusUpdate(String requestId, byte[] data, String credentialType, String uin, String printRefId, String registrationId)
-			throws DataShareException, ApiNotAccessibleException, IOException, Exception {
-		DataShare dataShare = null;
-		dataShare = dataShareUtil.getDataShare(data, cardPrintPolicyId, cardPrintPartnerId);
-
-		// Sending DataShare URL to ActiveMQ
-		PrintMQData response = new PrintMQData("mosip.print.json.data", registrationId, printRefId, dataShare.getUrl());
-		ResponseEntity<Object> entity = new ResponseEntity(response, HttpStatus.OK);
-		activePrintMQListener.sendToQueue(entity, 1, UinCardType.CARD);
-	}
 	private void printStatusUpdate(String requestId, byte[] data, String credentialType, String uin, String printRefId, String registrationId)
 			throws DataShareException, ApiNotAccessibleException, IOException, Exception {
 		DataShare dataShare = null;

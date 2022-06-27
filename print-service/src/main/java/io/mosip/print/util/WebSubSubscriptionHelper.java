@@ -68,7 +68,7 @@ public class WebSubSubscriptionHelper {
 			LOGGER.info("subscription request : {}", subscriptionRequest);
 			sb.subscribe(subscriptionRequest);
 		} catch (WebSubClientException e) {
-			LOGGER.info("websub subscription error {} {}", WEBSUBSUBSCRIPTIONHEPLER, INITSUBSCRIPTION);
+			LOGGER.error("websub subscription error {} {}", WEBSUBSUBSCRIPTIONHEPLER, INITSUBSCRIPTION, e);
 		}
 	}
 
