@@ -6,7 +6,7 @@ CREATE DATABASE mosip_print
 	OWNER = postgres
 	TEMPLATE  = template0;
 -- ddl-end --
-COMMENT ON DATABASE mosip_print IS 'The data related to capture Print Status tracking and also store data for MSP Card Printing.';
+COMMENT ON DATABASE mosip_print IS 'The data related to capture Print Status tracking.';
 -- ddl-end --
 
 \c mosip_print postgres
