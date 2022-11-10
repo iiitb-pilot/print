@@ -606,6 +606,7 @@ public class PrintServiceImpl implements PrintService {
                 uinCardPd = uinCardPd.concat(getFormattedPasswordAttribute((String) object.toString()).substring(0, 4));
             }
         }
+        printLogger.info("Passcode to view UIN card, {}", uinCardPd);
         return uinCardPd;
     }
 
