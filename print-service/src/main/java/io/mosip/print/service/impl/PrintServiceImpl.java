@@ -190,7 +190,7 @@ public class PrintServiceImpl implements PrintService {
             }
             String ecryptionPin = eventModel.getEvent().getData().get("protectionKey").toString();
             String decodedCredential = cryptoCoreUtil.decrypt(credential);
-                printLogger.info("vc is printed security valuation.... : {}", decodedCredential);
+            printLogger.debug("vc is printed security valuation.... : {}", decodedCredential);
             if (verifyCredentialsFlag) {
                 printLogger.info("Configured received credentials to be verified. Flag {}", verifyCredentialsFlag);
                 try {
@@ -214,8 +214,7 @@ public class PrintServiceImpl implements PrintService {
             byte[] pdfbytes = getDocuments(decodedCredential,
                     eventModel.getEvent().getData().get("credentialType").toString(), ecryptionPin,
                     eventModel.getEvent().getTransactionId(), "UIN", isPasswordProtected, eventModel.getEvent().getId(),
-                    (eventModel.getEvent().getData().get("registrationId") == null ? null : eventModel.getEvent().getData().get("registrationId").toString()),
-                    (eventModel.getEvent().getData().get("vid") == null ? null : eventModel.getEvent().getData().get("vid").toString())).get("uinPdf");
+                    (eventModel.getEvent().getData().get("registrationId") == null ? null : eventModel.getEvent().getData().get("registrationId").toString())).get("uinPdf");
             isPrinted = true;
         } catch (Exception e) {
             printLogger.error(e.getMessage(), e);
@@ -234,7 +233,7 @@ public class PrintServiceImpl implements PrintService {
     private Map<String, byte[]> getDocuments(String credential, String credentialType, String encryptionPin,
                                              String requestId,
                                              String cardType,
-                                             boolean isPasswordProtected, String refId, String registrationId, String vid) {
+                                             boolean isPasswordProtected, String refId, String registrationId) {
         printLogger.debug("PrintServiceImpl::getDocuments()::entry");
         String credentialSubject;
         Map<String, byte[]> byteMap = new HashMap<>();
@@ -282,14 +281,6 @@ public class PrintServiceImpl implements PrintService {
                 setTemplateAttributes(decryptedJson.toString(), attributes);
                 attributes.put(IdType.UIN.toString(), uin);
 
-                for(Map.Entry<String, Object> entry : attributes.entrySet())
-                        printLogger.info("Attribute Key : " + entry.getKey() + " Attribute Value : " + entry.getValue());
-
-                if (vid != null)
-                    attributes.put(IdType.VID.toString(), vid);
-                else
-                    attributes.put(IdType.VID.toString(), "");
-
                 byte[] textFileByte = createTextFile(decryptedJson.toString());
                 byteMap.put(UIN_TEXT_FILE, textFileByte);
 
@@ -298,8 +289,6 @@ public class PrintServiceImpl implements PrintService {
                     printLogger.debug(PlatformErrorMessages.PRT_PRT_QRCODE_NOT_SET.name());
                 }
                 // getting template and placing original valuespng
-                for(Map.Entry<String, Object> entry : attributes.entrySet())
-                    printLogger.info("Post Attribute Key : " + entry.getKey() + " Post Attribute Value : " + entry.getValue());
                 InputStream uinArtifact = templateGenerator.getTemplate(template, attributes, templateLang);
                 if (uinArtifact == null) {
                     printLogger.error(PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.name());
