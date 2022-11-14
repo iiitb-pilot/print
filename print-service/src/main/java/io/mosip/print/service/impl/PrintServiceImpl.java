@@ -190,7 +190,7 @@ public class PrintServiceImpl implements PrintService {
             }
             String ecryptionPin = eventModel.getEvent().getData().get("protectionKey").toString();
             String decodedCredential = cryptoCoreUtil.decrypt(credential);
-            printLogger.debug("vc is printed security valuation.... : {}", decodedCredential);
+                printLogger.info("vc is printed security valuation.... : {}", decodedCredential);
             if (verifyCredentialsFlag) {
                 printLogger.info("Configured received credentials to be verified. Flag {}", verifyCredentialsFlag);
                 try {
@@ -281,6 +281,10 @@ public class PrintServiceImpl implements PrintService {
                 }
                 setTemplateAttributes(decryptedJson.toString(), attributes);
                 attributes.put(IdType.UIN.toString(), uin);
+
+                for(Map.Entry<String, Object> entry : attributes.entrySet())
+                        printLogger.info("Attribute Key : " + entry.getKey() + " Attribute Value : " + entry.getValue());
+
                 if (vid != null)
                     attributes.put(IdType.VID.toString(), vid);
                 else
@@ -294,6 +298,8 @@ public class PrintServiceImpl implements PrintService {
                     printLogger.debug(PlatformErrorMessages.PRT_PRT_QRCODE_NOT_SET.name());
                 }
                 // getting template and placing original valuespng
+                for(Map.Entry<String, Object> entry : attributes.entrySet())
+                    printLogger.info("Post Attribute Key : " + entry.getKey() + " Post Attribute Value : " + entry.getValue());
                 InputStream uinArtifact = templateGenerator.getTemplate(template, attributes, templateLang);
                 if (uinArtifact == null) {
                     printLogger.error(PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.name());
