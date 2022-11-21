@@ -21,7 +21,9 @@ import org.springframework.util.MultiValueMap;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -32,8 +34,8 @@ public class NotificationUtil {
     @Autowired
     private RestApiClient restApiClient;
 
-    @Value("${emailResourse.url}")
-    private String emailResourseUrl;
+    @Value("${emailResource.url}")
+    private String emailResourceUrl;
 
     @Autowired
     private TemplateGenerator templateGenerator;
@@ -51,8 +53,8 @@ public class NotificationUtil {
     private static final String UIN_CARD_EMAIL_SUB_DEFAULT = "UIN Card Attached!";
     private static final String UIN_CARD_EMAIL_DEFAULT = "Your UIN Card is attached.";
 
-    public NotificationResponseDTO emailNotification(String emailId, String fileName, Map<String, Object> attributes,
-                                                     byte[] attachmentFile) throws Exception {
+    public List<NotificationResponseDTO> emailNotification(List<String> emailIds, String fileName, Map<String, Object> attributes,
+                                                           byte[] attachmentFile) throws Exception {
         log.info("sessionId", "idType", "id", "In emailNotification method of NotificationUtil service");
         HttpEntity<byte[]> doc = null;
         String fileText = null;
@@ -66,7 +68,7 @@ public class NotificationUtil {
         }
 
         ResponseWrapper<?> responseWrapper = null;
-        NotificationResponseDTO notifierResponse = new NotificationResponseDTO();
+        List<NotificationResponseDTO> notifierResponseList = new ArrayList<>();
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
@@ -74,12 +76,25 @@ public class NotificationUtil {
         emailMap.add("attachments", doc);
         emailMap.add("mailContent", getEmailContent(attributes));
         emailMap.add("mailSubject", getEmailSubject(attributes));
-        emailMap.add("mailTo", emailId);
-        HttpEntity<MultiValueMap<Object, Object>> httpEntity = new HttpEntity<>(emailMap, headers);
+
         log.info("sessionId", "idType", "id",
-                "In emailNotification method of NotificationUtil service emailResourseUrl: " + emailResourseUrl);
+                "In emailNotification method of NotificationUtil service emailResourceUrl: " + emailResourceUrl);
+        emailIds.forEach(emailId -> {
+            try {
+                notifierResponseList.add(sendEmail(emailId, headers, emailMap));
+            } catch (Exception e) {
+                log.error("Failed to send notification via email.{}", emailId, e);
+            }
+        });
+        return notifierResponseList;
+    }
+
+    private NotificationResponseDTO sendEmail(String emailId, HttpHeaders headers, MultiValueMap<Object, Object> emailMap) throws Exception {
+        NotificationResponseDTO notifierResponse = new NotificationResponseDTO();
         try {
-            responseWrapper = (ResponseWrapper<?>) restApiClient.postApi(emailResourseUrl,
+            emailMap.set("mailTo", emailId);
+            HttpEntity<MultiValueMap<Object, Object>> httpEntity = new HttpEntity<>(emailMap, headers);
+            ResponseWrapper<?> responseWrapper = (ResponseWrapper<?>) restApiClient.postApi(emailResourceUrl,
                     MediaType.MULTIPART_FORM_DATA, httpEntity, ResponseWrapper.class);
             if (responseWrapper != null) {
                 if (responseWrapper.getErrors() != null && !responseWrapper.getErrors().isEmpty()) {

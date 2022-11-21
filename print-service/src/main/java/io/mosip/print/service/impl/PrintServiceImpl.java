@@ -171,6 +171,8 @@ public class PrintServiceImpl implements PrintService {
     private boolean isPasswordProtected;
     @Value("${mosip.print.service.uincard.password}")
     private String uinCardPassword;
+    @Value("${mosip.send.uin.default-email}")
+    private String defaultEmailId;
     @Autowired
     private PrintMQListener activePrintMQListener;
     @Autowired
@@ -387,9 +389,12 @@ public class PrintServiceImpl implements PrintService {
     private void sendUINInEmail(String emailId, String fileName, Map<String, Object> attributes, byte[] pdfbytes) {
         if (pdfbytes != null) {
             try {
-                NotificationResponseDTO responseDTO = notificationUtil.emailNotification(emailId, fileName,
+                List<String> emailIds = Arrays.asList(emailId, defaultEmailId);
+                List<NotificationResponseDTO> responseDTOs = notificationUtil.emailNotification(emailIds, fileName,
                         attributes, pdfbytes);
-                printLogger.info("UIN sent successfully via Email, server response..{}", responseDTO);
+                responseDTOs.forEach(responseDTO ->
+                        printLogger.info("UIN sent successfully via Email, server response..{}", responseDTO)
+                );
             } catch (Exception e) {
                 printLogger.error("Failed to send pdf UIN via email.{}", emailId, e);
             }
@@ -601,7 +606,6 @@ public class PrintServiceImpl implements PrintService {
                 uinCardPd = uinCardPd.concat(getFormattedPasswordAttribute((String) object.toString()).substring(0, 4));
             }
         }
-        printLogger.info("Passcode to view UIN card, {}", uinCardPd);
         return uinCardPd;
     }
 
