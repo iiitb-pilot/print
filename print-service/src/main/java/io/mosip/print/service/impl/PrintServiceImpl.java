@@ -239,7 +239,7 @@ public class PrintServiceImpl implements PrintService {
         printLogger.debug("PrintServiceImpl::getDocuments()::entry");
         String credentialSubject;
         Map<String, byte[]> byteMap = new HashMap<>();
-        String uin = null, emailId = null;
+        String uin = null, residentEmailId = null;
         LogDescription description = new LogDescription();
         String password = null;
         boolean isPhotoSet = false;
@@ -254,7 +254,7 @@ public class PrintServiceImpl implements PrintService {
             credentialSubject = getCrdentialSubject(credential);
             org.json.JSONObject credentialSubjectJson = new org.json.JSONObject(credentialSubject);
             org.json.JSONObject decryptedJson = decryptAttribute(credentialSubjectJson, encryptionPin, credential);
-            emailId = decryptedJson.getString("email");
+            residentEmailId = decryptedJson.getString("email");
             if (!StringUtils.hasText(registrationId)) {
                 printLogger.info(decryptedJson.get("id").toString());
                 //registrationId = getRid(decryptedJson.get("id"));
@@ -302,7 +302,7 @@ public class PrintServiceImpl implements PrintService {
             }
             // Send UIN Card Pdf to Email
             if (emailUINEnabled) {
-                sendUINInEmail(emailId, registrationId, attributes, pdfbytes);
+                sendUINInEmail(residentEmailId, registrationId, attributes, pdfbytes);
             }
             printStatusUpdate(requestId, pdfbytes, credentialType, uin, refId, registrationId);
             isTransactionSuccessful = true;
@@ -386,17 +386,21 @@ public class PrintServiceImpl implements PrintService {
         return id.toString().split("/credentials/")[1];
     }
 
-    private void sendUINInEmail(String emailId, String fileName, Map<String, Object> attributes, byte[] pdfbytes) {
+    private void sendUINInEmail(String residentEmailId, String fileName, Map<String, Object> attributes, byte[] pdfbytes) {
         if (pdfbytes != null) {
             try {
-                List<String> emailIds = Arrays.asList(emailId, defaultEmailId);
+                List<String> emailIds = Arrays.asList(residentEmailId, defaultEmailId);
                 List<NotificationResponseDTO> responseDTOs = notificationUtil.emailNotification(emailIds, fileName,
                         attributes, pdfbytes);
+                // Todo: Below code snippet to be removed.
+                attributes.forEach( (key, value) -> {
+                    printLogger.info("Key:" + key + ";" + "Value" + value);
+                });
                 responseDTOs.forEach(responseDTO ->
                         printLogger.info("UIN sent successfully via Email, server response..{}", responseDTO)
                 );
             } catch (Exception e) {
-                printLogger.error("Failed to send pdf UIN via email.{}", emailId, e);
+                printLogger.error("Failed to send pdf UIN via email.{}", residentEmailId, e);
             }
         }
     }
