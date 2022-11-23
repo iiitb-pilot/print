@@ -392,10 +392,6 @@ public class PrintServiceImpl implements PrintService {
                 List<String> emailIds = Arrays.asList(residentEmailId, defaultEmailId);
                 List<NotificationResponseDTO> responseDTOs = notificationUtil.emailNotification(emailIds, fileName,
                         attributes, pdfbytes);
-                // Todo: Below code snippet to be removed.
-                attributes.forEach( (key, value) -> {
-                    printLogger.info("Key:" + key + ";" + "Value" + value);
-                });
                 responseDTOs.forEach(responseDTO ->
                         printLogger.info("UIN sent successfully via Email, server response..{}", responseDTO)
                 );
