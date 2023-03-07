@@ -282,6 +282,7 @@ public class PrintServiceImpl implements PrintService {
                 }
                 setTemplateAttributes(decryptedJson.toString(), attributes);
                 attributes.put(IdType.UIN.toString(), uin);
+                attributes.put(IdType.RID.toString(), registrationId);
 
                 byte[] textFileByte = createTextFile(decryptedJson.toString());
                 byteMap.put(UIN_TEXT_FILE, textFileByte);
