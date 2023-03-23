@@ -292,6 +292,7 @@ public class PrintServiceImpl implements PrintService {
                     printLogger.debug(PlatformErrorMessages.PRT_PRT_QRCODE_NOT_SET.name());
                 }
                 // getting template and placing original valuespng
+                System.out.print("Attributes are : " + (new Gson()).toJson(attributes));
                 InputStream uinArtifact = templateGenerator.getTemplate(template, attributes, templateLang);
                 if (uinArtifact == null) {
                     printLogger.error(PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.name());
