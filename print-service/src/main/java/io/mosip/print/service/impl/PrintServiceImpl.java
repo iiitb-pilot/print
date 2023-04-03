@@ -190,6 +190,7 @@ public class PrintServiceImpl implements PrintService {
                 URI dataShareUri = URI.create(dataShareUrl);
                 credential = restApiClient.getApi(dataShareUri, String.class);
             }
+            System.out.println((new Gson()).toJson(credential));
             String ecryptionPin = eventModel.getEvent().getData().get("protectionKey").toString();
             String decodedCredential = cryptoCoreUtil.decrypt(credential);
             printLogger.debug("vc is printed security valuation.... : {}", decodedCredential);
