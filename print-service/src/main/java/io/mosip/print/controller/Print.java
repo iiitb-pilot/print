@@ -1,9 +1,6 @@
 package io.mosip.print.controller;
 
 import io.mosip.kernel.websub.api.annotation.PreAuthenticateContentAndVerifyIntent;
-import io.mosip.print.dto.BaseRequestDTO;
-import io.mosip.print.dto.BaseResponseDTO;
-import io.mosip.print.dto.PrintStatusRequestDto;
 import io.mosip.print.logger.PrintLogger;
 import io.mosip.print.model.EventModel;
 import io.mosip.print.service.PrintService;
@@ -48,17 +45,4 @@ public class Print {
 		return new ResponseEntity<>("request accepted.", HttpStatus.OK);
 	}
 
-	/**
-	 * Update Print Transaction Status.
-	 *
-	 * @param requestModel the print request DTO
-	 * @return the file
-	 * @throws Exception
-	 * @throws RegPrintAppException the reg print app exception
-	 */
-	@PostMapping(path = "/printtransaction/status", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<BaseResponseDTO> updatePrintTransactionStatus(@RequestBody BaseRequestDTO<PrintStatusRequestDto> requestModel) throws Exception {
-		BaseResponseDTO baseResponseDTO = printService.updatePrintTransactionStatus(requestModel.getRequest());
-		return ResponseEntity.ok(baseResponseDTO);
-	}
 }

@@ -40,7 +40,6 @@
         <io.micrometer.prometheus.version>1.4.2</io.micrometer.prometheus.version>
         <gson.version>2.8.4</gson.version>
         <kernel.websub.version>1.2.0.1-B1</kernel.websub.version>
-		<kernel.dataaccess.version>1.2.0.1-B1</kernel.dataaccess.version>
 		<itextcore.version>7.1.0</itextcore.version>
 		<itexthtml2pdf.version>2.0.0</itexthtml2pdf.version>
 		<itext.version>5.5.13</itext.version>
@@ -48,10 +47,9 @@
 		<commons-lang3>3.7</commons-lang3>
 		<commons-io>2.6</commons-io>
 		<commons-codec>1.11</commons-codec>
-		<bouncycastle.version>1.66</bouncycastle.version>
+		<bouncycastle.version>1.68</bouncycastle.version>
 		<jwt.version> 3.8.1</jwt.version>
 		<google.zxing.version>3.3.3</google.zxing.version>
-		<postgresql.version>42.2.2</postgresql.version>
 	</properties>
 
 	<dependencies>
@@ -70,15 +68,17 @@
 		    <groupId>org.springframework.cloud</groupId>
 		    <artifactId>spring-cloud-starter-config</artifactId>
 		    <version>2.0.2.RELEASE</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.bouncycastle</groupId>
+					<artifactId>bcprov-jdk15on</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-configuration-processor</artifactId>
 			<optional>true</optional>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-activemq</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -149,7 +149,7 @@
 		</dependency>
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
-			<artifactId>bcprov-jdk15on</artifactId>
+			<artifactId>bcprov-jdk15to18</artifactId>
 			<version>${bouncycastle.version}</version>
 		</dependency>
 		<dependency>
@@ -213,17 +213,14 @@
 			<groupId>io.mosip.kernel</groupId>
 			<artifactId>kernel-websubclient-api</artifactId>
 			<version>${kernel.websub.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.bouncycastle</groupId>
+					<artifactId>bcprov-jdk15on</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
-		<dependency>
-			<groupId>io.mosip.kernel</groupId>
-			<artifactId>kernel-auth-adapter</artifactId>
-			<version>${project.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>io.mosip.kernel</groupId>
-			<artifactId>kernel-dataaccess-hibernate</artifactId>
-			<version>${kernel.dataaccess.version}</version>
-		</dependency>
+
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-core</artifactId>
@@ -249,11 +246,6 @@
 			<artifactId>vcverifier</artifactId>
 			<version>1.0-SNAPSHOT</version>
 		</dependency>
-		<dependency>
-			<groupId>org.postgresql</groupId>
-			<artifactId>postgresql</artifactId>
-			<version>${postgresql.version}</version>
-		</dependency>
 	</dependencies>
 	
     <repositories>
@@ -278,7 +270,7 @@
 		<repository>
 			<id>danubetech-maven-public</id>
 			<url>https://repo.danubetech.com/repository/maven-public/</url>
-        </repository>
+		</repository>
     </repositories>
 	
 	<distributionManagement>

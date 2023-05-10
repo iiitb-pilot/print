@@ -6,6 +6,7 @@ import io.mosip.kernel.websub.api.exception.WebSubClientException;
 import io.mosip.kernel.websub.api.model.SubscriptionChangeRequest;
 import io.mosip.kernel.websub.api.model.SubscriptionChangeResponse;
 import io.mosip.kernel.websub.api.model.UnsubscriptionRequest;
+import io.mosip.print.constant.LoggerFileConstant;
 import io.mosip.print.logger.PrintLogger;
 import io.mosip.print.model.CredentialStatusEvent;
 import org.slf4j.Logger;
@@ -67,7 +68,7 @@ public class WebSubSubscriptionHelper {
 			LOGGER.info("subscription request : {}", subscriptionRequest);
 			sb.subscribe(subscriptionRequest);
 		} catch (WebSubClientException e) {
-			LOGGER.error("websub subscription error {} {}", WEBSUBSUBSCRIPTIONHEPLER, INITSUBSCRIPTION, e);
+			LOGGER.info("websub subscription error {} {}", WEBSUBSUBSCRIPTIONHEPLER, INITSUBSCRIPTION);
 		}
 	}
 
