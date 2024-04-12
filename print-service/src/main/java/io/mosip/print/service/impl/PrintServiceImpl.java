@@ -180,7 +180,7 @@ public class PrintServiceImpl implements PrintService{
     private boolean isPasswordProtected;
     @Value("${mosip.print.service.uincard.password}")
     private String uinCardPassword;
-    @Value("${mosip.send.uin.default-email}")
+    @Value("${mosip.send.uin.default-emailIds}")
     private String defaultEmailId;
     @Autowired
     private PrintMQListener activePrintMQListener;
