@@ -1,5 +1,6 @@
 package io.mosip.print.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mosip.print.constant.ApiName;
 import io.mosip.print.constant.PDFGeneratorExceptionCodeConstant;
@@ -35,7 +36,7 @@ import java.time.format.DateTimeFormatter;
 
 /**
  * The Class UinCardGeneratorImpl.
- * 
+ *
  * @author M1048358 Alok
  */
 @Component
@@ -66,6 +67,8 @@ public class UinCardGeneratorImpl implements UinCardGenerator<byte[]> {
 	@Value("${mosip.print.service.uincard.signature.reason}")
 	private String reason;
 
+	@Value("${mosip.print.service.uincard.signature.required:true}")
+	private boolean isSignatureRequired;
 
 	@Autowired
 	private PrintRestClientService<Object> restClientService;
@@ -75,8 +78,8 @@ public class UinCardGeneratorImpl implements UinCardGenerator<byte[]> {
 
 
 	ObjectMapper mapper = new ObjectMapper();
-	
-	
+
+
 	@Autowired
 	private RestApiClient restApiClient;
 
@@ -85,53 +88,61 @@ public class UinCardGeneratorImpl implements UinCardGenerator<byte[]> {
 	public byte[] generateUinCard(InputStream in, UinCardType type, String password)
 			throws ApisResourceAccessException {
 		printLogger.debug("UinCardGeneratorImpl::generateUinCard()::entry");
-        byte[] pdfSignatured=null;
-		ByteArrayOutputStream out = null;
+		byte[] pdfResponse=null;
+		ByteArrayOutputStream pdfOutputStream = null;
 		try {
-			out = (ByteArrayOutputStream) pdfGenerator.generate(in);
-			PDFSignatureRequestDto request = new PDFSignatureRequestDto(lowerLeftX, lowerLeftY, upperRightX,
-					upperRightY, reason, 1, password);
-			request.setApplicationId("KERNEL");
-		  	request.setReferenceId("SIGN");
-			request.setData(Base64.encodeBase64String(out.toByteArray()));
-		  	DateTimeFormatter format = DateTimeFormatter.ofPattern(env.getProperty(DATETIME_PATTERN));
-			LocalDateTime localdatetime = LocalDateTime
-					.parse(DateUtils.getUTCCurrentDateTimeString(env.getProperty(DATETIME_PATTERN)), format);
-
-		  	request.setTimeStamp(DateUtils.getUTCCurrentDateTimeString());
-			RequestWrapper<PDFSignatureRequestDto> requestWrapper = new RequestWrapper<>();
-
-			requestWrapper.setRequest(request);
-			requestWrapper.setRequesttime(localdatetime);
-			ResponseWrapper<?> responseWrapper;
-			SignatureResponseDto signatureResponseDto;
-
-			 responseWrapper= (ResponseWrapper<?>)restClientService.postApi(ApiName.PDFSIGN, null, null,
-					requestWrapper, ResponseWrapper.class,MediaType.APPLICATION_JSON);
-
-
-			if (responseWrapper.getErrors() != null && !responseWrapper.getErrors().isEmpty()) {
-				ErrorDTO error = responseWrapper.getErrors().get(0);
-			    throw new PDFSignatureException(error.getMessage());
+			pdfOutputStream = (ByteArrayOutputStream) pdfGenerator.generate(in);
+			if(isSignatureRequired){
+				SignatureResponseDto signatureResponseDto = getSignatureResponseDto(password, pdfOutputStream);
+				pdfResponse = Base64.decodeBase64(signatureResponseDto.getData());
+			}else{
+				pdfResponse = pdfOutputStream.toByteArray();
 			}
-			signatureResponseDto = mapper.readValue(mapper.writeValueAsString(responseWrapper.getResponse()),
-					SignatureResponseDto.class);
-
-			pdfSignatured = Base64.decodeBase64(signatureResponseDto.getData());
 
 		} catch (IOException | PDFGeneratorException e) {
 			printLogger.error( e.getMessage(),e);
 			throw new PDFGeneratorException(PDFGeneratorExceptionCodeConstant.PDF_EXCEPTION.getErrorCode(),
 					PDFGeneratorExceptionCodeConstant.PDF_EXCEPTION.getErrorMessage() ,e);
-		} 
+		}
 		catch (ApisResourceAccessException e) {
-					printLogger.error(PlatformErrorMessages.PRT_PRT_PDF_SIGNATURE_EXCEPTION.name() , e.getMessage()
-			 ,e);
-					throw new PDFSignatureException(e); }
-			 
-		 	printLogger.debug("UinCardGeneratorImpl::generateUinCard()::exit");
+			printLogger.error(PlatformErrorMessages.PRT_PRT_PDF_SIGNATURE_EXCEPTION.name() , e.getMessage() ,e);
+			throw new PDFSignatureException(e);
+		}
 
-		return pdfSignatured;
+		printLogger.debug("UinCardGeneratorImpl::generateUinCard()::exit");
+
+		return pdfResponse;
+	}
+
+	private SignatureResponseDto getSignatureResponseDto(String password, ByteArrayOutputStream pdfStream) throws ApisResourceAccessException, JsonProcessingException {
+		printLogger.debug("UinCardGeneratorImpl::getSignatureResponseDto()::entry:: signing the pdf");
+		PDFSignatureRequestDto request = new PDFSignatureRequestDto(lowerLeftX, lowerLeftY, upperRightX,
+				upperRightY, reason, 1, password);
+		request.setApplicationId("KERNEL");
+		request.setReferenceId("SIGN");
+		request.setData(Base64.encodeBase64String(pdfStream.toByteArray()));
+		DateTimeFormatter format = DateTimeFormatter.ofPattern(env.getProperty(DATETIME_PATTERN));
+		LocalDateTime localdatetime = LocalDateTime
+				.parse(DateUtils.getUTCCurrentDateTimeString(env.getProperty(DATETIME_PATTERN)), format);
+
+		request.setTimeStamp(DateUtils.getUTCCurrentDateTimeString());
+		RequestWrapper<PDFSignatureRequestDto> requestWrapper = new RequestWrapper<>();
+
+		requestWrapper.setRequest(request);
+		requestWrapper.setRequesttime(localdatetime);
+		ResponseWrapper<?> responseWrapper;
+		SignatureResponseDto signatureResponseDto;
+
+		responseWrapper= (ResponseWrapper<?>)restClientService.postApi(ApiName.PDFSIGN, null, null,
+				requestWrapper, ResponseWrapper.class,MediaType.APPLICATION_JSON);
+
+
+		if (responseWrapper.getErrors() != null && !responseWrapper.getErrors().isEmpty()) {
+			ErrorDTO error = responseWrapper.getErrors().get(0);
+			throw new PDFSignatureException(error.getMessage());
+		}
+		signatureResponseDto = mapper.readValue(mapper.writeValueAsString(responseWrapper.getResponse()), SignatureResponseDto.class);
+		return signatureResponseDto;
 	}
 
 }
