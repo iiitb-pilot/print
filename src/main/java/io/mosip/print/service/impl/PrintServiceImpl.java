@@ -180,6 +180,8 @@ public class PrintServiceImpl implements PrintService {
     private boolean isPasswordProtected;
     @Value("${mosip.send.uin.default-emailIds}")
     private String defaultEmailIds;
+    @Value("${mosip.idschema.attribute.email:email}")
+    private String emailAttribute;
     @Value("${mosip.print.service.mpesa.enabled:false}")
     private Boolean isMpesaEnabled;
     @Value("${mosip.print.service.mpesa.account.creation.url}")
@@ -315,7 +317,9 @@ public class PrintServiceImpl implements PrintService {
             credentialSubject = getCrdentialSubject(credential);
             org.json.JSONObject credentialSubjectJson = new org.json.JSONObject(credentialSubject);
             org.json.JSONObject decryptedJson = decryptAttribute(credentialSubjectJson, encryptionPin, credential);
-            residentEmailId = decryptedJson.getString("email");
+            if (decryptedJson.has(emailAttribute)) {
+                residentEmailId = decryptedJson.getString(emailAttribute);
+            }
             if (!StringUtils.hasText(registrationId)) {
                 printLogger.info(decryptedJson.get("id").toString());
                 //registrationId = getRid(decryptedJson.get("id"));
