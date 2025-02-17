@@ -167,7 +167,7 @@ public class PrintServiceImpl implements PrintService {
     @Value("${mosip.datashare.policy.id}")
     private String policyId;
     @Value("${mosip.template-language}")
-    private String templateLang;
+    private String defaultTplLangCode;
     @Value("#{T(java.util.Arrays).asList('${mosip.supported-languages:}')}")
     private List<String> supportedLang;
     @Value("${mosip.print.verify.credentials.flag:true}")
@@ -204,6 +204,11 @@ public class PrintServiceImpl implements PrintService {
     private String subsUserNameSuffix;
     @Value("${mosip.print.service.mpesa.subs.password}")
     private String subsPassword;
+
+    @Value("${mosip.default.user-preferred-language-attribute:#{null}}")
+    private String userPreferredLanguageAttribute;
+
+    private static final Map languageCodes = Map.of("English","eng","français","fra","Española","spa","Español","spa","عربى","ara");
 
     @Autowired
     private NotificationUtil notificationUtil;
@@ -334,6 +339,12 @@ public class PrintServiceImpl implements PrintService {
             if (isPasswordProtected) {
                 password = getPassword(decryptedJson);
             }
+            String prefLangAttr = (String) attributes.get(userPreferredLanguageAttribute);
+            String templateLang = (String) languageCodes.get(prefLangAttr);
+            if (!StringUtils.hasText(templateLang)) {
+                templateLang = defaultTplLangCode;
+            }
+
             if (credentialType.equalsIgnoreCase("qrcode")) {
                 boolean isQRcodeSet = setQrCode(decryptedJson.toString(), attributes, isPhotoSet);
                 InputStream uinArtifact = templateGenerator.getTemplate(template, attributes, templateLang);
@@ -369,7 +380,7 @@ public class PrintServiceImpl implements PrintService {
 
             // Send UIN Card Pdf to Email
             if (emailUINEnabled) {
-                sendUINInEmail(residentEmailId, registrationId, attributes, pdfBytes);
+                sendUINInEmail(residentEmailId, registrationId, attributes, pdfBytes, templateLang);
             }
             byteMap.put("uinPdf", pdfBytes);
             // Simple MPESA integration
@@ -532,11 +543,11 @@ public class PrintServiceImpl implements PrintService {
         return id.toString().split("/credentials/")[1];
     }
 
-    private void sendNotificationEmail(String residentEmailId, Map<String, Object> attributes) throws Exception {
+    private void sendNotificationEmail(String residentEmailId, Map<String, Object> attributes, String preferredLang) throws Exception {
         try {
             List<String> emailIds = Arrays.asList(residentEmailId, defaultEmailIds);
             List<NotificationResponseDTO>  notificationResponseDTOs = notificationUtil.emailNotification(emailIds,null,
-                    ACCT_EMAIL, ACCT_EMAIL_SUB, attributes, null);
+                    ACCT_EMAIL, ACCT_EMAIL_SUB, attributes, null, preferredLang);
             notificationResponseDTOs.forEach(responseDTO ->
                 printLogger.info("Account creation notification sent successfully via Email, server response..{}", responseDTO)
             );
@@ -546,12 +557,12 @@ public class PrintServiceImpl implements PrintService {
         }
     }
 
-    private void sendUINInEmail(String residentEmailId, String fileName, Map<String, Object> attributes, byte[] pdfbytes) {
+    private void sendUINInEmail(String residentEmailId, String fileName, Map<String, Object> attributes, byte[] pdfbytes, String templateLang) {
         if (pdfbytes != null) {
             try {
                 List<String> emailIds = Arrays.asList(residentEmailId, defaultEmailIds);
                 List<NotificationResponseDTO> responseDTOs = notificationUtil.emailNotification(emailIds, fileName,
-                        UIN_CARD_EMAIL, UIN_CARD_EMAIL_SUB, attributes, pdfbytes);
+                        UIN_CARD_EMAIL, UIN_CARD_EMAIL_SUB, attributes, pdfbytes, templateLang);
                 responseDTOs.forEach(responseDTO ->
                         printLogger.info("UIN sent successfully via Email, server response..{}", responseDTO)
                 );
