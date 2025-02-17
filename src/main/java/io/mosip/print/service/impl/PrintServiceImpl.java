@@ -336,13 +336,14 @@ public class PrintServiceImpl implements PrintService {
                 attributes.put("isPhotoSet", isPhotoSet);
             }
             uin = decryptedJson.getString("UIN");
-            if (isPasswordProtected) {
-                password = getPassword(decryptedJson);
-            }
             String prefLangAttr = (String) attributes.get(userPreferredLanguageAttribute);
             String templateLang = (String) languageCodes.get(prefLangAttr);
             if (!StringUtils.hasText(templateLang)) {
                 templateLang = defaultTplLangCode;
+            }
+
+            if (isPasswordProtected) {
+                password = getPassword(decryptedJson, templateLang);
             }
 
             if (credentialType.equalsIgnoreCase("qrcode")) {
@@ -385,7 +386,7 @@ public class PrintServiceImpl implements PrintService {
             byteMap.put("uinPdf", pdfBytes);
             // Simple MPESA integration
             if (isMpesaEnabled) {
-                integrateMpesa(residentEmailId, attributes);
+                integrateMpesa(residentEmailId, attributes, templateLang);
             }
             String datashareUrl = getDatashareUrl(pdfBytes);
             printStatusUpdate(requestId, CredentialStatusConstant.PRINTED.name(), datashareUrl);
@@ -465,7 +466,7 @@ public class PrintServiceImpl implements PrintService {
         return byteMap;
     }
 
-    private void integrateMpesa(String residentEmailId, Map<String, Object> attributes) {
+    private void integrateMpesa(String residentEmailId, Map<String, Object> attributes, String templateLang) {
         try {
             if (!StringUtils.hasText(residentEmailId) || attributes.get("phone") == null) {
                 printLogger.info("Resident email Id or phone number is null for MPesa Integration.");
@@ -499,7 +500,7 @@ public class PrintServiceImpl implements PrintService {
                             && "success".equalsIgnoreCase(responseEntity.getBody().getStatus())) {
                         printLogger.info("Account Created and the details sent successfully via Email, " +
                                 "server response..{}", responseEntity.getBody().toString());
-                        sendNotificationEmail(residentEmailId, attributes);
+                        sendNotificationEmail(residentEmailId, attributes, templateLang);
                     }
                 }
             }
@@ -543,11 +544,11 @@ public class PrintServiceImpl implements PrintService {
         return id.toString().split("/credentials/")[1];
     }
 
-    private void sendNotificationEmail(String residentEmailId, Map<String, Object> attributes, String preferredLang) throws Exception {
+    private void sendNotificationEmail(String residentEmailId, Map<String, Object> attributes, String templateLang) throws Exception {
         try {
             List<String> emailIds = Arrays.asList(residentEmailId, defaultEmailIds);
             List<NotificationResponseDTO>  notificationResponseDTOs = notificationUtil.emailNotification(emailIds,null,
-                    ACCT_EMAIL, ACCT_EMAIL_SUB, attributes, null, preferredLang);
+                    ACCT_EMAIL, ACCT_EMAIL_SUB, attributes, null, templateLang);
             notificationResponseDTOs.forEach(responseDTO ->
                 printLogger.info("Account creation notification sent successfully via Email, server response..{}", responseDTO)
             );
@@ -753,7 +754,7 @@ public class PrintServiceImpl implements PrintService {
      * @return
      * @throws Exception
      */
-    private String getPassword(org.json.JSONObject jsonObject) throws ApisResourceAccessException, IOException {
+    private String getPassword(org.json.JSONObject jsonObject, String templateLang) throws ApisResourceAccessException, IOException {
 
         String[] attributes = env.getProperty(UINCARDPASSWORD).split("\\|");
         List<String> list = new ArrayList<>(Arrays.asList(attributes));
