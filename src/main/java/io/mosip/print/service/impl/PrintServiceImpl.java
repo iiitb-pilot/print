@@ -336,6 +336,11 @@ public class PrintServiceImpl implements PrintService {
                 attributes.put("isPhotoSet", isPhotoSet);
             }
             uin = decryptedJson.getString("UIN");
+
+            setTemplateAttributes(decryptedJson.toString(), attributes);
+            attributes.put(IdType.UIN.toString(), uin);
+            attributes.put(IdType.RID.toString(), registrationId);
+
             printLogger.info("userPreferredLanguageAttribute, {}", userPreferredLanguageAttribute);
             String prefLangAttr = (String) attributes.get(userPreferredLanguageAttribute);
             printLogger.info("prefLangAttr, {}", prefLangAttr);
@@ -362,9 +367,7 @@ public class PrintServiceImpl implements PrintService {
                 if (!isPhotoSet) {
                     printLogger.debug(PlatformErrorMessages.PRT_PRT_APPLICANT_PHOTO_NOT_SET.name());
                 }
-                setTemplateAttributes(decryptedJson.toString(), attributes);
-                attributes.put(IdType.UIN.toString(), uin);
-                attributes.put(IdType.RID.toString(), registrationId);
+
 
                 byte[] textFileByte = createTextFile(decryptedJson.toString());
                 byteMap.put(UIN_TEXT_FILE, textFileByte);
