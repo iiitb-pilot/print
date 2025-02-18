@@ -336,8 +336,13 @@ public class PrintServiceImpl implements PrintService {
                 attributes.put("isPhotoSet", isPhotoSet);
             }
             uin = decryptedJson.getString("UIN");
+            printLogger.info("userPreferredLanguageAttribute, {}", userPreferredLanguageAttribute);
             String prefLangAttr = (String) attributes.get(userPreferredLanguageAttribute);
+            printLogger.info("prefLangAttr, {}", prefLangAttr);
+            printLogger.info("languageCodes, {}", languageCodes);
             String templateLang = (String) languageCodes.get(prefLangAttr);
+
+            printLogger.info("templateLang, {}", templateLang);
             if (!StringUtils.hasText(templateLang)) {
                 templateLang = defaultTplLangCode;
             }
