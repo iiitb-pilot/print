@@ -44,6 +44,8 @@ import org.springframework.web.client.RestTemplate;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.URI;
 import java.security.InvalidAlgorithmParameterException;
@@ -207,8 +209,11 @@ public class PrintServiceImpl implements PrintService {
 
     @Value("${mosip.default.user-preferred-language-attribute:#{null}}")
     private String userPreferredLanguageAttribute;
-
-    private static final Map languageCodes = Map.of("English","eng","français","fra","Española","spa","Español","spa","عربى","ara");
+    @Value("${mosip.print.qrcode.logo:#{null}}")
+    private String qrCodeLogo;
+    @Value("#{${mosip.print.language-code.map:{}}}")
+    private Map<String, String> languageCodes;
+    //private static final Map languageCodes = Map.of("English","eng","français","fra","Española","spa","Español","spa","عربى","ara");
 
     @Autowired
     private NotificationUtil notificationUtil;
@@ -345,7 +350,7 @@ public class PrintServiceImpl implements PrintService {
             String prefLangAttr = (String) attributes.get(userPreferredLanguageAttribute);
             printLogger.info("prefLangAttr, {}", prefLangAttr);
             printLogger.info("languageCodes, {}", languageCodes);
-            String templateLang = (String) languageCodes.get(prefLangAttr);
+            String templateLang = (String) languageCodes.get(Base64.encodeBase64String(prefLangAttr.getBytes()));
 
             printLogger.info("templateLang, {}", templateLang);
             if (!StringUtils.hasText(templateLang)) {
@@ -653,7 +658,8 @@ public class PrintServiceImpl implements PrintService {
         if (isPhotoSet) {
             qrJsonObj.remove("biometrics");
         }
-        byte[] qrCodeBytes = qrCodeGenerator.generateQrCode(qrJsonObj.toString(), QrVersion.V30);
+        BufferedImage logoImage = ImageIO.read(new ByteArrayInputStream(Base64.decodeBase64(qrCodeLogo)));
+        byte[] qrCodeBytes = qrCodeGenerator.generateQrCodeWithLogo(qrJsonObj.toString(), QrVersion.V30, logoImage);
         if (qrCodeBytes != null) {
             String imageString = Base64.encodeBase64String(qrCodeBytes);
             attributes.put(QRCODE, "data:image/png;base64," + imageString);

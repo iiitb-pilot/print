@@ -2,6 +2,7 @@ package io.mosip.print.spi;
 
 import io.mosip.print.exception.QrcodeGenerationException;
 
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 
 /**
@@ -28,6 +29,20 @@ public interface QrCodeGenerator<T> {
 	 *                                   the byte stream fail
 	 */
 	byte[] generateQrCode(String data, T version) throws QrcodeGenerationException, IOException;
+
+	/**
+	 * Method to generate QR Code
+	 *
+	 * @param data    data to encode in the QR code
+	 * @param version QR Code version
+	 * @param logoImage logo image
+	 * @return array of byte containing QR Code with logo in PNG format
+	 * @throws QrcodeGenerationException exceptions which may occur when encoding a
+	 *                                   QRcode using the Writer framework.
+	 * @throws IOException               exceptions which may occur when write to
+	 *                                   the byte stream fail
+	 */
+	byte[] generateQrCodeWithLogo(String data, T version, BufferedImage logoImage) throws QrcodeGenerationException, IOException;
 
 	/**
 	 * Method to generate QR Code
