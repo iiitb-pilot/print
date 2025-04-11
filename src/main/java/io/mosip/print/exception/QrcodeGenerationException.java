@@ -26,4 +26,7 @@ public class QrcodeGenerationException extends BaseCheckedException {
 		super(errorCode, errorMessage, rootCause);
 	}
 
+	public QrcodeGenerationException(String errorMessage) {
+		super(errorMessage);
+	}
 }

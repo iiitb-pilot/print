@@ -211,9 +211,10 @@ public class PrintServiceImpl implements PrintService {
     private String userPreferredLanguageAttribute;
     @Value("${mosip.print.qrcode.logo:#{null}}")
     private String qrCodeLogo;
+    @Value("${mosip.print.qrcode.logo.enabled:true}")
+    private boolean isQrCodeWithLogoEnabled;
     @Value("#{${mosip.print.language-code.map:{}}}")
     private Map<String, String> languageCodes;
-    //private static final Map languageCodes = Map.of("English","eng","français","fra","Española","spa","Español","spa","عربى","ara");
 
     @Autowired
     private NotificationUtil notificationUtil;
@@ -321,6 +322,7 @@ public class PrintServiceImpl implements PrintService {
         boolean isTransactionSuccessful = false;
         String template = UIN_CARD_TEMPLATE;
         byte[] pdfBytes = null;
+        String templateLang = null;
 
         try {
 
@@ -346,17 +348,15 @@ public class PrintServiceImpl implements PrintService {
             attributes.put(IdType.UIN.toString(), uin);
             attributes.put(IdType.RID.toString(), registrationId);
 
-            printLogger.info("userPreferredLanguageAttribute, {}", userPreferredLanguageAttribute);
             String prefLangAttr = (String) attributes.get(userPreferredLanguageAttribute);
-            printLogger.info("prefLangAttr, {}", prefLangAttr);
-            printLogger.info("languageCodes, {}", languageCodes);
-            String templateLang = (String) languageCodes.get(Base64.encodeBase64String(prefLangAttr.getBytes()));
-
-            printLogger.info("templateLang, {}", templateLang);
+            printLogger.info("userPreferredLanguageAttribute: {}, prefLangAttr: {}, languageCodes: {}", userPreferredLanguageAttribute, prefLangAttr, languageCodes);
+            if (prefLangAttr != null && languageCodes != null && !languageCodes.isEmpty()) {
+                templateLang = (String) languageCodes.get(Base64.encodeBase64String(prefLangAttr.getBytes()));
+            }
             if (!StringUtils.hasText(templateLang)) {
                 templateLang = defaultTplLangCode;
             }
-
+            printLogger.info("templateLang, {}", templateLang);
             if (isPasswordProtected) {
                 password = getPassword(decryptedJson, templateLang);
             }
@@ -373,9 +373,8 @@ public class PrintServiceImpl implements PrintService {
                     printLogger.debug(PlatformErrorMessages.PRT_PRT_APPLICANT_PHOTO_NOT_SET.name());
                 }
 
-
-                byte[] textFileByte = createTextFile(decryptedJson.toString());
-                byteMap.put(UIN_TEXT_FILE, textFileByte);
+//                byte[] textFileByte = createTextFile(decryptedJson.toString());
+//                byteMap.put(UIN_TEXT_FILE, textFileByte);
 
                 boolean isQRcodeSet = setQrCode(decryptedJson.toString(), attributes, isPhotoSet);
                 if (!isQRcodeSet) {
@@ -658,14 +657,18 @@ public class PrintServiceImpl implements PrintService {
         if (isPhotoSet) {
             qrJsonObj.remove("biometrics");
         }
-        BufferedImage logoImage = ImageIO.read(new ByteArrayInputStream(Base64.decodeBase64(qrCodeLogo)));
-        byte[] qrCodeBytes = qrCodeGenerator.generateQrCodeWithLogo(qrJsonObj.toString(), QrVersion.V30, logoImage);
+        byte[] qrCodeBytes = null;
+        if(isQrCodeWithLogoEnabled) {
+            BufferedImage logoImage = ImageIO.read(new ByteArrayInputStream(Base64.decodeBase64(qrCodeLogo)));
+            qrCodeBytes = qrCodeGenerator.generateQrCodeWithLogo(qrJsonObj.toString(), QrVersion.V30, logoImage);
+        } else {
+            qrCodeBytes = qrCodeGenerator.generateQrCode(qrJsonObj.toString(), QrVersion.V30);
+        }
         if (qrCodeBytes != null) {
             String imageString = Base64.encodeBase64String(qrCodeBytes);
             attributes.put(QRCODE, "data:image/png;base64," + imageString);
             isQRCodeSet = true;
         }
-
         return isQRCodeSet;
     }
 

@@ -96,11 +96,9 @@ public class QrcodeGeneratorImpl implements QrCodeGenerator<QrVersion> {
 		BufferedImage combinedImage = getCombinedImage(byteMatrix, logoImage);
 		ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 		if (!ImageIO.write(combinedImage, QrcodeConstants.FILE_FORMAT, outputStream)) {
-			throw new IOException("Could not write an image of format " + QrcodeConstants.FILE_FORMAT);
+			throw new QrcodeGenerationException("Could not write the qrcode of format " + QrcodeConstants.FILE_FORMAT);
 		}
-		//MatrixToImageWriter.writeToStream(byteMatrix, QrcodeConstants.FILE_FORMAT, outputStream);
 		return outputStream.toByteArray();
-
 	}
 
 	private BufferedImage getCombinedImage(BitMatrix bitMatrix, BufferedImage logoImage) {
