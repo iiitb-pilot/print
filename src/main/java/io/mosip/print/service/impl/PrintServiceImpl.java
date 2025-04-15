@@ -12,16 +12,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
@@ -31,7 +22,9 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import io.mosip.print.dto.*;
 import io.mosip.print.exception.*;
+import io.mosip.print.util.*;
 import io.mosip.vercred.CredentialsVerifier;
 import io.mosip.vercred.exception.ProofDocumentNotFoundException;
 import io.mosip.vercred.exception.ProofTypeNotFoundException;
@@ -58,10 +51,6 @@ import io.mosip.print.constant.PDFGeneratorExceptionCodeConstant;
 import io.mosip.print.constant.PlatformSuccessMessages;
 import io.mosip.print.constant.QrVersion;
 import io.mosip.print.constant.UinCardType;
-import io.mosip.print.dto.CryptoWithPinRequestDto;
-import io.mosip.print.dto.CryptoWithPinResponseDto;
-import io.mosip.print.dto.DataShare;
-import io.mosip.print.dto.JsonValue;
 import io.mosip.print.logger.LogDescription;
 import io.mosip.print.logger.PrintLogger;
 import io.mosip.print.model.CredentialStatusEvent;
@@ -71,17 +60,6 @@ import io.mosip.print.service.PrintService;
 import io.mosip.print.service.UinCardGenerator;
 import io.mosip.print.spi.CbeffUtil;
 import io.mosip.print.spi.QrCodeGenerator;
-import io.mosip.print.util.AuditLogRequestBuilder;
-import io.mosip.print.util.CbeffToBiometricUtil;
-import io.mosip.print.util.CryptoCoreUtil;
-import io.mosip.print.util.CryptoUtil;
-import io.mosip.print.util.DataShareUtil;
-import io.mosip.print.util.DateUtils;
-import io.mosip.print.util.JsonUtil;
-import io.mosip.print.util.RestApiClient;
-import io.mosip.print.util.TemplateGenerator;
-import io.mosip.print.util.Utilities;
-import io.mosip.print.util.WebSubSubscriptionHelper;
 
 @Service
 public class PrintServiceImpl implements PrintService{
@@ -111,6 +89,8 @@ public class PrintServiceImpl implements PrintService{
 
 	/** The Constant UIN_CARD_TEMPLATE. */
 	private static final String UIN_CARD_TEMPLATE = "RPR_UIN_CARD_TEMPLATE";
+    private static final String UIN_CARD_EMAIL_SUB = "RPR_UIN_CARD_EMAIL_SUB";
+    private static final String UIN_CARD_EMAIL = "RPR_UIN_CARD_EMAIL";
 
 	/** The Constant FACE. */
 	private static final String FACE = "Face";
@@ -125,7 +105,7 @@ public class PrintServiceImpl implements PrintService{
 	private static final String QRCODE = "QrCode";
 
 	/** The Constant UINCARDPASSWORD. */
-	private static final String UINCARDPASSWORD = "mosip.registration.processor.print.service.uincard.password";
+	private static final String UINCARDPASSWORD = "mosip.print.service.uincard.password";
 
 	/** The print logger. */
 	Logger printLogger = PrintLogger.getLogger(PrintServiceImpl.class);
@@ -173,6 +153,9 @@ public class PrintServiceImpl implements PrintService{
 	@Autowired
 	private CredentialsVerifier credentialsVerifier;
 
+	@Autowired
+	private NotificationUtil notificationUtil;
+
 	@Value("${mosip.datashare.partner.id}")
 	private String partnerId;
 
@@ -187,7 +170,14 @@ public class PrintServiceImpl implements PrintService{
 
 	@Value("${mosip.print.verify.credentials.flag:true}")
 	private boolean verifyCredentialsFlag;
-
+    @Value("${mosip.send.uin.email.attachment.enabled:false}")
+    private Boolean emailUINEnabled;
+    @Value("${mosip.print.service.uincard.pdf.password.enable:false}")
+    private boolean isPasswordProtected;
+    @Value("${mosip.send.uin.default-emailIds}")
+    private String defaultEmailIds;
+    @Value("${mosip.idschema.attribute.email:email}")
+    private String emailAttribute;
 
 	public boolean generateCard(EventModel eventModel) {
 		String credential = null;
@@ -216,6 +206,7 @@ public class PrintServiceImpl implements PrintService{
 				}catch (ProofDocumentNotFoundException | ProofTypeNotFoundException e){
 					printLogger.error("Proof document is not available in the received credentials." +
 							" Id: {}, Transaction Id: {}", eventModel.getEvent().getId(), eventModel.getEvent().getTransactionId());
+                	return false;
 				}catch (UnknownException | PubicKeyNotFoundException e){
 					printLogger.error("Received Credentials failed in verifiable credential verify method. So, the credentials will not be printed." +
 							" Id: {}, Transaction Id: {}", eventModel.getEvent().getId(), eventModel.getEvent().getTransactionId());
@@ -225,8 +216,9 @@ public class PrintServiceImpl implements PrintService{
 			Map proofMap = new HashMap<String, String>();
 			proofMap = (Map) eventModel.getEvent().getData().get("proof");
 			byte[] pdfbytes = getDocuments(decodedCredential,
-					eventModel.getEvent().getData().get("credentialType").toString(), ecryptionPin,
-					eventModel.getEvent().getTransactionId(), "UIN", false).get("uinPdf");
+                    eventModel.getEvent().getData().get("credentialType").toString(), eventModel.getEvent().getData().get("protectionKey").toString(),
+                    eventModel.getEvent().getTransactionId(), "UIN", isPasswordProtected, eventModel.getEvent().getId(),
+                    (eventModel.getEvent().getData().get("registrationId") == null ? null : eventModel.getEvent().getData().get("registrationId").toString())).get("uinPdf");
 			isPrinted = true; 
 		}catch (Exception e){
 			printLogger.error(e.getMessage() , e);
@@ -245,11 +237,11 @@ public class PrintServiceImpl implements PrintService{
 	private Map<String, byte[]> getDocuments(String credential, String credentialType, String encryptionPin,
 			String requestId,
 			String cardType,
-			boolean isPasswordProtected) {
+                                             boolean isPasswordProtected, String refId, String registrationId) {
 		printLogger.debug("PrintServiceImpl::getDocuments()::entry");
 		String credentialSubject;
 		Map<String, byte[]> byteMap = new HashMap<>();
-		String uin = null;
+        String uin = null, residentEmailId = null;
 		LogDescription description = new LogDescription();
 		String password = null;
 		String individualBio = null;
@@ -257,13 +249,16 @@ public class PrintServiceImpl implements PrintService{
 		boolean isTransactionSuccessful = false;
 		String template = UIN_CARD_TEMPLATE;
 		byte[] pdfbytes = null;
+        String templateLang = null;
 		try {
 
 			credentialSubject = getCrdentialSubject(credential);
 			org.json.JSONObject credentialSubjectJson = new org.json.JSONObject(credentialSubject);
 			org.json.JSONObject decryptedJson = decryptAttribute(credentialSubjectJson, encryptionPin, credential);
-			individualBio = decryptedJson.getString("biometrics");
-			String individualBiometric = new String(individualBio);
+            if (decryptedJson.has(emailAttribute)) {
+                residentEmailId = decryptedJson.getString(emailAttribute);
+            }
+
 			uin = decryptedJson.getString("UIN");
 			if (isPasswordProtected) {
 				password = getPassword(uin);
@@ -275,31 +270,41 @@ public class PrintServiceImpl implements PrintService{
 						password);
 
 			} else {
+				boolean isPhotoSet = false;
+				if (decryptedJson.has("biometrics")) {
+					individualBio = decryptedJson.getString("biometrics");
+					String individualBiometric = new String(individualBio);
+					isPhotoSet = setApplicantPhoto(individualBiometric, attributes);
+				}
 
-			boolean isPhotoSet = setApplicantPhoto(individualBiometric, attributes);
-			if (!isPhotoSet) {
-				printLogger.debug(PlatformErrorMessages.PRT_PRT_APPLICANT_PHOTO_NOT_SET.name());
+				if (!isPhotoSet) {
+					printLogger.debug(PlatformErrorMessages.PRT_PRT_APPLICANT_PHOTO_NOT_SET.name());
+				}
+				setTemplateAttributes(decryptedJson.toString(), attributes);
+				attributes.put(IdType.UIN.toString(), uin);
+
+				byte[] textFileByte = createTextFile(decryptedJson.toString());
+				byteMap.put(UIN_TEXT_FILE, textFileByte);
+
+				boolean isQRcodeSet = setQrCode(decryptedJson.toString(), attributes);
+				if (!isQRcodeSet) {
+					printLogger.debug(PlatformErrorMessages.PRT_PRT_QRCODE_NOT_SET.name());
+				}
+				printLogger.info("Attributes:{}", JSONObject.toJSONString(attributes));
+				// getting template and placing original valuespng
+				InputStream uinArtifact = templateGenerator.getTemplate(template, attributes, templateLang);
+				if (uinArtifact == null) {
+					printLogger.error(PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.name());
+					throw new TemplateProcessingFailureException(
+							PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.getCode());
+				}
+				pdfbytes = uinCardGenerator.generateUinCard(uinArtifact, UinCardType.PDF, password);
 			}
-			setTemplateAttributes(decryptedJson.toString(), attributes);
-			attributes.put(IdType.UIN.toString(), uin);
 
-			byte[] textFileByte = createTextFile(decryptedJson.toString());
-			byteMap.put(UIN_TEXT_FILE, textFileByte);
-
-			boolean isQRcodeSet = setQrCode(decryptedJson.toString(), attributes);
-			if (!isQRcodeSet) {
-				printLogger.debug(PlatformErrorMessages.PRT_PRT_QRCODE_NOT_SET.name());
-			}
-			// getting template and placing original valuespng
-			InputStream uinArtifact = templateGenerator.getTemplate(template, attributes, templateLang);
-			if (uinArtifact == null) {
-				printLogger.error(PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.name());
-				throw new TemplateProcessingFailureException(
-						PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.getCode());
-			}
-			pdfbytes = uinCardGenerator.generateUinCard(uinArtifact, UinCardType.PDF, password);
-
-		}
+            // Send UIN Card Pdf to Email
+            if (emailUINEnabled) {
+                sendUINInEmail(residentEmailId, registrationId, attributes, pdfbytes, templateLang);
+            }
 			printStatusUpdate(requestId, pdfbytes, credentialType);
 			isTransactionSuccessful = true;
 
@@ -380,6 +385,21 @@ public class PrintServiceImpl implements PrintService{
 		return byteMap;
 	}
 
+
+    private void sendUINInEmail(String residentEmailId, String fileName, Map<String, Object> attributes, byte[] pdfbytes, String templateLang) {
+        if (pdfbytes != null) {
+            try {
+                List<String> emailIds = Arrays.asList(residentEmailId, defaultEmailIds);
+                List<NotificationResponseDTO> responseDTOs = notificationUtil.emailNotification(emailIds, fileName,
+                        UIN_CARD_EMAIL, UIN_CARD_EMAIL_SUB, attributes, pdfbytes, templateLang);
+                responseDTOs.forEach(responseDTO ->
+                        printLogger.info("UIN sent successfully via Email, server response..{}", responseDTO)
+                );
+            } catch (Exception e) {
+                printLogger.error("Failed to send pdf UIN via email.{}", residentEmailId, e);
+            }
+        }
+    }
 	/**
 	 * Creates the text file.
 	 *
@@ -521,6 +541,10 @@ public class PrintServiceImpl implements PrintService{
 					Object object = demographicIdentity.get(value);
 					if (object != null) {
 						try {
+                            if (object instanceof Collection) {
+                                // In order to parse the collection values, mainly for VC.
+                                object = JsonUtil.writeValueAsString(object);
+                            }
 						obj = new JSONParser().parse(object.toString());
 						} catch (Exception e) {
 							obj = object;
