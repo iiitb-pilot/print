@@ -249,7 +249,6 @@ public class PrintServiceImpl implements PrintService{
 		boolean isTransactionSuccessful = false;
 		String template = UIN_CARD_TEMPLATE;
 		byte[] pdfbytes = null;
-        String templateLang = null;
 		try {
 
 			credentialSubject = getCrdentialSubject(credential);
