@@ -28,6 +28,12 @@ The deploy print service in production follow the given steps:
 ## Configuration
 Refer to the [configuration guide](docs/configuration.md).
 
+Below templates are used in the reference implementation.
+
+	**RPR_UIN_CARD_TEMPLATE**: UIN PDF card template, this can be customized in template table in master database
+	**RPR_UIN_CARD_EMAIL**: Email content template for UIN attachment, this can be customized in template table in master database
+	**RPR_UIN_CARD_EMAIL_SUB**: Email subject template for UIN attachment, this can be customized in template table in master database
+
 ## Test
 Automated functaionl tests available in [Functional Tests repo](https://github.com/mosip/mosip-functional-tests).
 ## License
