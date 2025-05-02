@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import io.mosip.print.constant.*;
 import io.mosip.print.dto.*;
 import io.mosip.print.exception.*;
 import io.mosip.print.util.*;
@@ -42,15 +43,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
-import io.mosip.print.constant.EventId;
-import io.mosip.print.constant.EventName;
-import io.mosip.print.constant.EventType;
-import io.mosip.print.constant.IdType;
-import io.mosip.print.constant.ModuleName;
-import io.mosip.print.constant.PDFGeneratorExceptionCodeConstant;
-import io.mosip.print.constant.PlatformSuccessMessages;
-import io.mosip.print.constant.QrVersion;
-import io.mosip.print.constant.UinCardType;
 import io.mosip.print.logger.LogDescription;
 import io.mosip.print.logger.PrintLogger;
 import io.mosip.print.model.CredentialStatusEvent;
@@ -248,10 +240,8 @@ public class PrintServiceImpl implements PrintService{
 		String individualBio = null;
 		Map<String, Object> attributes = new LinkedHashMap<>();
 		boolean isTransactionSuccessful = false;
-		String template = UIN_CARD_TEMPLATE;
 		byte[] pdfbytes = null;
 		try {
-
 			credentialSubject = getCrdentialSubject(credential);
 			org.json.JSONObject credentialSubjectJson = new org.json.JSONObject(credentialSubject);
 			org.json.JSONObject decryptedJson = decryptAttribute(credentialSubjectJson, encryptionPin, credential);
@@ -272,6 +262,14 @@ public class PrintServiceImpl implements PrintService{
 			if (isPasswordProtected) {
 				password = getPassword(uin);
 			}
+
+
+			Optional<TemplateType> templateOpt = TemplateMapper.determineTemplateType(attributes);
+			if (templateOpt.isEmpty()) {
+				throw new TemplateProcessingFailureException(PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.getMessage());
+			}
+			String template = templateOpt.get().getValue();
+
 			if (credentialType.equalsIgnoreCase("qrcode")) {
                 boolean isQRcodeSet = setQrCode(decryptedJson.toString(), attributes, isPhotoSet);
 				InputStream uinArtifact = templateGenerator.getTemplate(template, attributes, templateLang);
@@ -388,6 +386,8 @@ public class PrintServiceImpl implements PrintService{
 
 
     private void sendUINInEmail(String residentEmailId, String fileName, Map<String, Object> attributes, byte[] pdfbytes, String templateLang) {
+
+
         if (pdfbytes != null) {
             try {
                 List<String> emailIds = Arrays.asList(residentEmailId, defaultEmailIds);
