@@ -225,7 +225,7 @@ public class PrintServiceImpl implements PrintService{
 	private Map<String, byte[]> getDocuments(String credential, String credentialType, String encryptionPin,
 			String requestId,
 			String cardType,
-                                             boolean isPasswordProtected, String refId, String registrationId) {
+			 boolean isPasswordProtected, String refId, String registrationId) {
 		printLogger.debug("PrintServiceImpl::getDocuments()::entry");
 		String credentialSubject;
 		Map<String, byte[]> byteMap = new HashMap<>();
@@ -260,30 +260,25 @@ public class PrintServiceImpl implements PrintService{
 			}
 
 
-			Optional<TemplateType> templateOpt = TemplateMapper.determineTemplateType(attributes);
-			if (templateOpt.isEmpty()) {
+			Optional<TemplateMapper.TemplateMappedConfig> templateConfigOpt = TemplateMapper.getTemplatesConfig(attributes);
+			if (templateConfigOpt.isEmpty()) {
 				throw new TemplateProcessingFailureException(PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.getMessage());
 			}
-			String template = templateOpt.get().getValue();
+			TemplateMapper.TemplateMappedConfig templateMappedConfig = templateConfigOpt.get();
+			String template = templateMappedConfig.getDocumentTemplateName().getValue();
+
+			boolean isQRcodeSet = setQrCode(decryptedJson.toString(), attributes, isPhotoSet);
+			if (!isQRcodeSet) {
+				printLogger.debug(PlatformErrorMessages.PRT_PRT_QRCODE_NOT_SET.name());
+			}
 
 			if (credentialType.equalsIgnoreCase("qrcode")) {
-                boolean isQRcodeSet = setQrCode(decryptedJson.toString(), attributes, isPhotoSet);
 				InputStream uinArtifact = templateGenerator.getTemplate(template, attributes, templateLang);
 				pdfbytes = uinCardGenerator.generateUinCard(uinArtifact, UinCardType.PDF,
 						password);
-
 			} else {
-
 				if (!isPhotoSet) {
 					printLogger.debug(PlatformErrorMessages.PRT_PRT_APPLICANT_PHOTO_NOT_SET.name());
-				}
-
-//                byte[] textFileByte = createTextFile(decryptedJson.toString());
-//                byteMap.put(UIN_TEXT_FILE, textFileByte);
-
-                boolean isQRcodeSet = setQrCode(decryptedJson.toString(), attributes, isPhotoSet);
-				if (!isQRcodeSet) {
-					printLogger.debug(PlatformErrorMessages.PRT_PRT_QRCODE_NOT_SET.name());
 				}
 				printLogger.info("Attributes:{}", JSONObject.toJSONString(attributes));
 				// getting template and placing original valuespng
@@ -294,9 +289,14 @@ public class PrintServiceImpl implements PrintService{
 							PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.getCode());
 				}
 				pdfbytes = uinCardGenerator.generateUinCard(uinArtifact, UinCardType.PDF, password);
+				if (templateMappedConfig.getEmailSubjectTemplate() != null && templateMappedConfig.getEmailTemplate() != null) {
+					TemplateType emailSubject = templateMappedConfig.getEmailSubjectTemplate();
+					TemplateType emailBody = templateMappedConfig.getEmailTemplate();
+					Attachment attachment = pdfbytes != null ? new Attachment(cardType + ".pdf", pdfbytes) : null;
+					sendEmail(residentEmailId, emailSubject, emailBody, attachment, attributes, templateLang);
+				}
 			}
 
-            // Send UIN Card Pdf to Email
             if (emailUINEnabled) {
                 sendUINInEmail(residentEmailId, registrationId, attributes, pdfbytes, templateLang);
             }
