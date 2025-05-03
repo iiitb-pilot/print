@@ -269,24 +269,19 @@ public class PrintServiceImpl implements PrintService{
 						)
 				);
 			}
-
 			TemplateMapper.TemplateMappedConfig templateMappedConfig = templateConfigOpt.get();
 			String template = templateMappedConfig.getDocumentTemplateName().getValue();
-
-
-
-			boolean isQRcodeSet = setQrCode(decryptedJson.toString(), attributes, isPhotoSet);
-			if (!isQRcodeSet) {
-				printLogger.debug(PlatformErrorMessages.PRT_PRT_QRCODE_NOT_SET.name());
+			if (template != null) {
+				boolean isQRcodeSet = setQrCode(decryptedJson.toString(), attributes, isPhotoSet);
+				if (!isQRcodeSet) {
+					printLogger.debug(PlatformErrorMessages.PRT_PRT_QRCODE_NOT_SET.name());
+				}
+				if (!isPhotoSet) {
+					printLogger.debug(PlatformErrorMessages.PRT_PRT_APPLICANT_PHOTO_NOT_SET.name());
+				}
+				printLogger.info("Attributes:{}", JSONObject.toJSONString(attributes));
+				pdfbytes = generatePdfFromTemplate(template, attributes, templateLang, password);
 			}
-
-			if (!isPhotoSet) {
-				printLogger.debug(PlatformErrorMessages.PRT_PRT_APPLICANT_PHOTO_NOT_SET.name());
-			}
-			
-			printLogger.info("Attributes:{}", JSONObject.toJSONString(attributes));
-			
-			pdfbytes = generatePdfFromTemplate(template, attributes, templateLang, password);
 
 			if (templateMappedConfig.getEmailSubjectTemplate() != null && templateMappedConfig.getEmailTemplate() != null) {
 				TemplateType emailSubject = templateMappedConfig.getEmailSubjectTemplate();
