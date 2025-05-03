@@ -2,6 +2,7 @@ package io.mosip.print.util;
 
 import io.mosip.print.constant.ProcessType;
 import io.mosip.print.constant.TemplateType;
+import lombok.Getter;
 
 import java.util.Collections;
 import java.util.EnumMap;
@@ -9,13 +10,15 @@ import java.util.Map;
 import java.util.Optional;
 
 public final class TemplateMapper {
-    private static final Map<ProcessType, TemplateType> PROCESS_TO_TEMPLATE_TYPE;
+    private static final Map<ProcessType, TemplateMappedConfig> PROCESS_TO_TEMPLATE_TYPE;
 
     static {
-        Map<ProcessType, TemplateType> map = new EnumMap<>(ProcessType.class);
-        map.put(ProcessType.NEW, TemplateType.UIN_CARD_TEMPLATE);
-        map.put(ProcessType.UPDATE, TemplateType.UIN_CARD_TEMPLATE);
-        map.put(ProcessType.CRVS_NEW, TemplateType.UIN_CARD_EMAIL_SUB);
+        Map<ProcessType, TemplateMappedConfig> map = new EnumMap<>(ProcessType.class);
+        map.put(ProcessType.NEW, new TemplateMappedConfig(
+                TemplateType.UIN_CARD_TEMPLATE,
+                TemplateType.UIN_CARD_EMAIL_SUB,
+                TemplateType.UIN_CARD_EMAIL
+        ));
 
         PROCESS_TO_TEMPLATE_TYPE = Collections.unmodifiableMap(map);
     }
@@ -25,12 +28,17 @@ public final class TemplateMapper {
     }
 
     /**
-     * Determines the appropriate template type based on the process attributes
+     * Retrieves the template configuration mapped to the specified process type
+     * from the provided attributes map. If the map does not contain a valid
+     * process type or is invalid, an empty {@code Optional} is returned.
      *
-     * @param attributes Map of process attributes
-     * @return Optional containing the corresponding TemplateType, or empty if no matching process type is found
+     * @param attributes a map of attributes where the key "processType" is
+     *                   expected to represent the process type as a string.
+     * @return an {@code Optional} containing the {@code TemplateMappedConfig}
+     *         corresponding to the process type if available; otherwise, an
+     *         empty {@code Optional}.
      */
-    public static Optional<TemplateType> determineTemplateType(Map<String, Object> attributes) {
+    public static Optional<TemplateMappedConfig> getTemplatesConfig(Map<String, Object> attributes) {
         if (attributes == null || !attributes.containsKey("processType")) {
             return Optional.empty();
         }
@@ -42,5 +50,19 @@ public final class TemplateMapper {
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }
+    }
+
+    @Getter
+    public static class TemplateMappedConfig {
+        private final TemplateType documentTemplateName;
+        private final TemplateType emailSubjectTemplate;
+        private final TemplateType emailTemplate;
+
+        public TemplateMappedConfig(TemplateType documentTemplateName, TemplateType emailSubjectTemplate, TemplateType emailTemplate) {
+            this.documentTemplateName = documentTemplateName;
+            this.emailSubjectTemplate = emailSubjectTemplate;
+            this.emailTemplate = emailTemplate;
+        }
+
     }
 }
