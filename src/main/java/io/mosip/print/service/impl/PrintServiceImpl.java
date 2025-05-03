@@ -262,41 +262,40 @@ public class PrintServiceImpl implements PrintService{
 
 			Optional<TemplateMapper.TemplateMappedConfig> templateConfigOpt = TemplateMapper.getTemplatesConfig(attributes);
 			if (templateConfigOpt.isEmpty()) {
-				throw new TemplateProcessingFailureException(PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.getMessage());
+				throw new TemplateProcessingFailureException(
+						String.format(
+								PlatformErrorMessages.PRT_TEM_MAPPER_NOT_FOUND.getMessage(),
+								attributes.get(TemplateMapper.PROCESS_TYPE_KEY)
+						)
+				);
 			}
+
 			TemplateMapper.TemplateMappedConfig templateMappedConfig = templateConfigOpt.get();
 			String template = templateMappedConfig.getDocumentTemplateName().getValue();
+
+
 
 			boolean isQRcodeSet = setQrCode(decryptedJson.toString(), attributes, isPhotoSet);
 			if (!isQRcodeSet) {
 				printLogger.debug(PlatformErrorMessages.PRT_PRT_QRCODE_NOT_SET.name());
 			}
 
-			if (credentialType.equalsIgnoreCase("qrcode")) {
-				InputStream uinArtifact = templateGenerator.getTemplate(template, attributes, templateLang);
-				pdfbytes = uinCardGenerator.generateUinCard(uinArtifact, UinCardType.PDF,
-						password);
-			} else {
-				if (!isPhotoSet) {
-					printLogger.debug(PlatformErrorMessages.PRT_PRT_APPLICANT_PHOTO_NOT_SET.name());
-				}
-				printLogger.info("Attributes:{}", JSONObject.toJSONString(attributes));
-				// getting template and placing original valuespng
-				InputStream uinArtifact = templateGenerator.getTemplate(template, attributes, templateLang);
-				if (uinArtifact == null) {
-					printLogger.error(PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.name());
-					throw new TemplateProcessingFailureException(
-							PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.getCode());
-				}
-				pdfbytes = uinCardGenerator.generateUinCard(uinArtifact, UinCardType.PDF, password);
-				if (templateMappedConfig.getEmailSubjectTemplate() != null && templateMappedConfig.getEmailTemplate() != null) {
-					TemplateType emailSubject = templateMappedConfig.getEmailSubjectTemplate();
-					TemplateType emailBody = templateMappedConfig.getEmailTemplate();
-					Attachment attachment = pdfbytes != null ? new Attachment(cardType + ".pdf", pdfbytes) : null;
-					sendEmail(residentEmailId, emailSubject, emailBody, attachment, attributes, templateLang);
-				}
+			if (!isPhotoSet) {
+				printLogger.debug(PlatformErrorMessages.PRT_PRT_APPLICANT_PHOTO_NOT_SET.name());
+			}
+			
+			printLogger.info("Attributes:{}", JSONObject.toJSONString(attributes));
+			
+			pdfbytes = generatePdfFromTemplate(template, attributes, templateLang, password);
+
+			if (templateMappedConfig.getEmailSubjectTemplate() != null && templateMappedConfig.getEmailTemplate() != null) {
+				TemplateType emailSubject = templateMappedConfig.getEmailSubjectTemplate();
+				TemplateType emailBody = templateMappedConfig.getEmailTemplate();
+				Attachment attachment = pdfbytes != null ? new Attachment(cardType + ".pdf", pdfbytes) : null;
+				sendEmail(residentEmailId, emailSubject, emailBody, attachment, attributes, templateLang);
 			}
 
+			// leaving it as it is to keep backward compatibility
             if (emailUINEnabled) {
                 sendUINInEmail(residentEmailId, registrationId, attributes, pdfbytes, templateLang);
             }
@@ -781,6 +780,34 @@ public class PrintServiceImpl implements PrintService{
 		webSubSubscriptionHelper.printStatusUpdateEvent(topic, creEvent);
 	}
 
+	/**
+	 * Processes a template and generates a PDF document.
+	 *
+	 * @param template        the template name
+	 * @param attributes      the template attributes
+	 * @param templateLang    the template language
+	 * @param password        the password for PDF protection (can be null)
+	 * @return                the generated PDF as byte array
+	 * @throws TemplateProcessingFailureException if template processing fails
+	 */
+	private byte[] generatePdfFromTemplate(String template, Map<String, Object> attributes, String templateLang, String password) {
+		try {
+			InputStream uinArtifact = templateGenerator.getTemplate(template, attributes, templateLang);
+			
+			if (uinArtifact == null) {
+				printLogger.error(PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.name());
+				throw new TemplateProcessingFailureException(
+						PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.getCode());
+			}
+			
+			return uinCardGenerator.generateUinCard(uinArtifact, UinCardType.PDF, password);
+		} catch (Exception e) {
+			printLogger.error("Error in template processing or PDF generation", e);
+			throw new TemplateProcessingFailureException(
+					PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.getCode());
+		}
+	}
+	
 	public org.json.JSONObject decryptAttribute(org.json.JSONObject data, String encryptionPin, String credential)
 			throws ParseException {
 

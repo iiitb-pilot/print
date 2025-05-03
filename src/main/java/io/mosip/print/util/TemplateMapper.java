@@ -11,6 +11,7 @@ import java.util.Optional;
 
 public final class TemplateMapper {
     private static final Map<ProcessType, TemplateMappedConfig> PROCESS_TO_TEMPLATE_TYPE;
+    public static final String PROCESS_TYPE_KEY = "processType";
 
     static {
         Map<ProcessType, TemplateMappedConfig> map = new EnumMap<>(ProcessType.class);
@@ -39,12 +40,12 @@ public final class TemplateMapper {
      *         empty {@code Optional}.
      */
     public static Optional<TemplateMappedConfig> getTemplatesConfig(Map<String, Object> attributes) {
-        if (attributes == null || !attributes.containsKey("processType")) {
+        if (attributes == null || !attributes.containsKey(PROCESS_TYPE_KEY)) {
             return Optional.empty();
         }
 
         try {
-            String processTypeStr = String.valueOf(attributes.get("processType")).toUpperCase();
+            String processTypeStr = String.valueOf(attributes.get(PROCESS_TYPE_KEY)).toUpperCase();
             ProcessType processType = ProcessType.valueOf(processTypeStr);
             return Optional.ofNullable(PROCESS_TO_TEMPLATE_TYPE.get(processType));
         } catch (IllegalArgumentException e) {
