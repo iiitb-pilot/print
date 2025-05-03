@@ -31,6 +31,7 @@ import io.mosip.vercred.exception.ProofDocumentNotFoundException;
 import io.mosip.vercred.exception.ProofTypeNotFoundException;
 import io.mosip.vercred.exception.PubicKeyNotFoundException;
 import io.mosip.vercred.exception.UnknownException;
+import lombok.Getter;
 import org.apache.commons.codec.binary.Base64;
 import org.joda.time.DateTime;
 import org.json.simple.JSONArray;
@@ -78,11 +79,6 @@ public class PrintServiceImpl implements PrintService{
 
 	/** The Constant VALUE. */
 	private static final String VALUE = "value";
-
-	/** The Constant UIN_CARD_TEMPLATE. */
-	private static final String UIN_CARD_TEMPLATE = "RPR_UIN_CARD_TEMPLATE";
-    private static final String UIN_CARD_EMAIL_SUB = "RPR_UIN_CARD_EMAIL_SUB";
-    private static final String UIN_CARD_EMAIL = "RPR_UIN_CARD_EMAIL";
 
 	/** The Constant FACE. */
 	private static final String FACE = "Face";
@@ -385,22 +381,87 @@ public class PrintServiceImpl implements PrintService{
 	}
 
 
-    private void sendUINInEmail(String residentEmailId, String fileName, Map<String, Object> attributes, byte[] pdfbytes, String templateLang) {
+	@Getter
+	static class Attachment {
+		private final String fileName;
+		private final byte[] data;
 
+		public Attachment(String fileName, byte[] data) {
+			this.fileName = fileName;
+			this.data = data;
+		}
+	}
 
-        if (pdfbytes != null) {
-            try {
-                List<String> emailIds = Arrays.asList(residentEmailId, defaultEmailIds);
-                List<NotificationResponseDTO> responseDTOs = notificationUtil.emailNotification(emailIds, fileName,
-                        UIN_CARD_EMAIL, UIN_CARD_EMAIL_SUB, attributes, pdfbytes, templateLang);
-                responseDTOs.forEach(responseDTO ->
-                        printLogger.info("UIN sent successfully via Email, server response..{}", responseDTO)
-                );
-            } catch (Exception e) {
-                printLogger.error("Failed to send pdf UIN via email.{}", residentEmailId, e);
-            }
-        }
-    }
+	private Optional<List<NotificationResponseDTO>> sendEmail(
+			String residentEmailId,
+			TemplateType emailSubject,
+			TemplateType emailBody,
+			Attachment attachment,
+			Map<String, Object> attributes,
+			String templateLang
+	) {
+
+		Optional<List<NotificationResponseDTO>> noResult = Optional.empty();
+		if (residentEmailId == null) {
+			printLogger.error("Resident email ID parameter is null");
+			return noResult;
+		}
+		if (emailSubject == null) {
+			printLogger.error("Email subject parameter is null");
+			return noResult;
+		}
+		if (emailBody == null) {
+			printLogger.error("Email body parameter is null");
+			return noResult;
+		}
+
+		if (attachment != null && (attachment.getFileName() == null || attachment.getData() == null)) {
+			printLogger.error("Both filename and data must be provided for email attachment");
+			return noResult;
+		}
+
+		List<String> emailIds = new ArrayList<>();
+		emailIds.add(residentEmailId);
+		if (defaultEmailIds != null) {
+			emailIds.add(defaultEmailIds);
+		}
+
+		try {
+			List<NotificationResponseDTO> responseDTOs = notificationUtil.emailNotification(
+					emailIds,
+					attachment != null ? attachment.getFileName() : null,
+					emailBody.getValue(),
+					emailSubject.getValue(),
+					attributes,
+					attachment != null ? attachment.getData() : null,
+					templateLang
+			);
+			return Optional.of(responseDTOs);
+		} catch (Exception e) {
+			printLogger.error("Failed to send email to {}: {}", residentEmailId, e.getMessage(), e);
+			return noResult;
+		}
+	}
+
+	private void sendUINInEmail(String residentEmailId, String fileName, Map<String, Object> attributes, byte[] pdfbytes, String templateLang) {
+		if (pdfbytes == null) {
+			return;
+		}
+
+		var responsesDtos = sendEmail(
+				residentEmailId,
+				TemplateType.UIN_CARD_EMAIL_SUB,
+				TemplateType.UIN_CARD_EMAIL,
+				new Attachment(fileName, pdfbytes),
+				attributes,
+				templateLang
+		);
+		responsesDtos.ifPresent(responseDTOs -> {
+			responseDTOs.forEach(responseDTO ->
+					printLogger.info("Email sent successfully, server response: {}", responseDTO)
+			);
+		});
+	}
 	/**
 	 * Creates the text file.
 	 *
