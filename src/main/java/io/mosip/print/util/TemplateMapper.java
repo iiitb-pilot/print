@@ -59,6 +59,13 @@ public final class TemplateMapper {
         private final TemplateType emailTemplate;
 
         public TemplateMappedConfig(TemplateType documentTemplateName, TemplateType emailSubjectTemplate, TemplateType emailTemplate) {
+            boolean hasEmailTemplate = emailTemplate != null;
+            boolean hasEmailSubject = emailSubjectTemplate != null;
+
+            if (hasEmailTemplate ^ hasEmailSubject) {
+                throw new IllegalArgumentException("Email template and subject must both be present or both be null");
+            }
+
             this.documentTemplateName = documentTemplateName;
             this.emailSubjectTemplate = emailSubjectTemplate;
             this.emailTemplate = emailTemplate;
