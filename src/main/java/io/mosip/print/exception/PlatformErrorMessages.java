@@ -50,6 +50,8 @@ public enum PlatformErrorMessages {
 	PRT_BDD_ABIS_ABORT(PlatformConstants.PRT_PRINT_PREFIX + "002",
 			"ABIS for the Reference ID and Request ID was Abort"),
 	/** The PRT tem processing failure. */
+	PRT_TEM_MAPPER_NOT_FOUND(PlatformConstants.PRT_PRINT_PREFIX + "030", "Template mapper could not be mapped for processType = %s"),
+
 	PRT_TEM_PROCESSING_FAILURE(PlatformConstants.PRT_PRINT_PREFIX + "002", "The Processing of Template Failed "),
 	PRT_SYS_JSON_PARSING_EXCEPTION(PlatformConstants.PRT_PRINT_PREFIX + "009", "Error while parsing Json"),
 	PRT_AUT_INVALID_TOKEN(PlatformConstants.PRT_PRINT_PREFIX + "01", "Invalid Token Present"),

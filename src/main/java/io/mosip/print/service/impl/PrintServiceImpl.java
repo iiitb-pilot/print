@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import io.mosip.print.constant.*;
 import io.mosip.print.dto.*;
 import io.mosip.print.exception.*;
 import io.mosip.print.util.*;
@@ -30,6 +31,7 @@ import io.mosip.vercred.exception.ProofDocumentNotFoundException;
 import io.mosip.vercred.exception.ProofTypeNotFoundException;
 import io.mosip.vercred.exception.PubicKeyNotFoundException;
 import io.mosip.vercred.exception.UnknownException;
+import lombok.Getter;
 import org.apache.commons.codec.binary.Base64;
 import org.joda.time.DateTime;
 import org.json.simple.JSONArray;
@@ -42,15 +44,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
-import io.mosip.print.constant.EventId;
-import io.mosip.print.constant.EventName;
-import io.mosip.print.constant.EventType;
-import io.mosip.print.constant.IdType;
-import io.mosip.print.constant.ModuleName;
-import io.mosip.print.constant.PDFGeneratorExceptionCodeConstant;
-import io.mosip.print.constant.PlatformSuccessMessages;
-import io.mosip.print.constant.QrVersion;
-import io.mosip.print.constant.UinCardType;
 import io.mosip.print.logger.LogDescription;
 import io.mosip.print.logger.PrintLogger;
 import io.mosip.print.model.CredentialStatusEvent;
@@ -86,11 +79,6 @@ public class PrintServiceImpl implements PrintService{
 
 	/** The Constant VALUE. */
 	private static final String VALUE = "value";
-
-	/** The Constant UIN_CARD_TEMPLATE. */
-	private static final String UIN_CARD_TEMPLATE = "RPR_UIN_CARD_TEMPLATE";
-    private static final String UIN_CARD_EMAIL_SUB = "RPR_UIN_CARD_EMAIL_SUB";
-    private static final String UIN_CARD_EMAIL = "RPR_UIN_CARD_EMAIL";
 
 	/** The Constant FACE. */
 	private static final String FACE = "Face";
@@ -237,7 +225,7 @@ public class PrintServiceImpl implements PrintService{
 	private Map<String, byte[]> getDocuments(String credential, String credentialType, String encryptionPin,
 			String requestId,
 			String cardType,
-                                             boolean isPasswordProtected, String refId, String registrationId) {
+			 boolean isPasswordProtected, String refId, String registrationId) {
 		printLogger.debug("PrintServiceImpl::getDocuments()::entry");
 		String credentialSubject;
 		Map<String, byte[]> byteMap = new HashMap<>();
@@ -248,10 +236,8 @@ public class PrintServiceImpl implements PrintService{
 		String individualBio = null;
 		Map<String, Object> attributes = new LinkedHashMap<>();
 		boolean isTransactionSuccessful = false;
-		String template = UIN_CARD_TEMPLATE;
 		byte[] pdfbytes = null;
 		try {
-
 			credentialSubject = getCrdentialSubject(credential);
 			org.json.JSONObject credentialSubjectJson = new org.json.JSONObject(credentialSubject);
 			org.json.JSONObject decryptedJson = decryptAttribute(credentialSubjectJson, encryptionPin, credential);
@@ -272,37 +258,39 @@ public class PrintServiceImpl implements PrintService{
 			if (isPasswordProtected) {
 				password = getPassword(uin);
 			}
-			if (credentialType.equalsIgnoreCase("qrcode")) {
-                boolean isQRcodeSet = setQrCode(decryptedJson.toString(), attributes, isPhotoSet);
-				InputStream uinArtifact = templateGenerator.getTemplate(template, attributes, templateLang);
-				pdfbytes = uinCardGenerator.generateUinCard(uinArtifact, UinCardType.PDF,
-						password);
 
-			} else {
 
-				if (!isPhotoSet) {
-					printLogger.debug(PlatformErrorMessages.PRT_PRT_APPLICANT_PHOTO_NOT_SET.name());
-				}
-
-//                byte[] textFileByte = createTextFile(decryptedJson.toString());
-//                byteMap.put(UIN_TEXT_FILE, textFileByte);
-
-                boolean isQRcodeSet = setQrCode(decryptedJson.toString(), attributes, isPhotoSet);
+			Optional<TemplateMapper.TemplateMappedConfig> templateConfigOpt = TemplateMapper.getTemplatesConfig(attributes);
+			if (templateConfigOpt.isEmpty()) {
+				throw new TemplateProcessingFailureException(
+						String.format(
+								PlatformErrorMessages.PRT_TEM_MAPPER_NOT_FOUND.getMessage(),
+								attributes.get(TemplateMapper.PROCESS_TYPE_KEY)
+						)
+				);
+			}
+			TemplateMapper.TemplateMappedConfig templateMappedConfig = templateConfigOpt.get();
+			String template = templateMappedConfig.getDocumentTemplateName().getValue();
+			if (template != null) {
+				boolean isQRcodeSet = setQrCode(decryptedJson.toString(), attributes, isPhotoSet);
 				if (!isQRcodeSet) {
 					printLogger.debug(PlatformErrorMessages.PRT_PRT_QRCODE_NOT_SET.name());
 				}
-				printLogger.info("Attributes:{}", JSONObject.toJSONString(attributes));
-				// getting template and placing original valuespng
-				InputStream uinArtifact = templateGenerator.getTemplate(template, attributes, templateLang);
-				if (uinArtifact == null) {
-					printLogger.error(PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.name());
-					throw new TemplateProcessingFailureException(
-							PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.getCode());
+				if (!isPhotoSet) {
+					printLogger.debug(PlatformErrorMessages.PRT_PRT_APPLICANT_PHOTO_NOT_SET.name());
 				}
-				pdfbytes = uinCardGenerator.generateUinCard(uinArtifact, UinCardType.PDF, password);
+				printLogger.info("Attributes:{}", JSONObject.toJSONString(attributes));
+				pdfbytes = generatePdfFromTemplate(template, attributes, templateLang, password);
 			}
 
-            // Send UIN Card Pdf to Email
+			if (templateMappedConfig.getEmailSubjectTemplate() != null && templateMappedConfig.getEmailTemplate() != null) {
+				TemplateType emailSubject = templateMappedConfig.getEmailSubjectTemplate();
+				TemplateType emailBody = templateMappedConfig.getEmailTemplate();
+				Attachment attachment = pdfbytes != null ? new Attachment(cardType + ".pdf", pdfbytes) : null;
+				sendEmail(residentEmailId, emailSubject, emailBody, attachment, attributes, templateLang);
+			}
+
+			// leaving it as it is to keep backward compatibility
             if (emailUINEnabled) {
                 sendUINInEmail(residentEmailId, registrationId, attributes, pdfbytes, templateLang);
             }
@@ -387,20 +375,87 @@ public class PrintServiceImpl implements PrintService{
 	}
 
 
-    private void sendUINInEmail(String residentEmailId, String fileName, Map<String, Object> attributes, byte[] pdfbytes, String templateLang) {
-        if (pdfbytes != null) {
-            try {
-                List<String> emailIds = Arrays.asList(residentEmailId, defaultEmailIds);
-                List<NotificationResponseDTO> responseDTOs = notificationUtil.emailNotification(emailIds, fileName,
-                        UIN_CARD_EMAIL, UIN_CARD_EMAIL_SUB, attributes, pdfbytes, templateLang);
-                responseDTOs.forEach(responseDTO ->
-                        printLogger.info("UIN sent successfully via Email, server response..{}", responseDTO)
-                );
-            } catch (Exception e) {
-                printLogger.error("Failed to send pdf UIN via email.{}", residentEmailId, e);
-            }
-        }
-    }
+	@Getter
+	static class Attachment {
+		private final String fileName;
+		private final byte[] data;
+
+		public Attachment(String fileName, byte[] data) {
+			this.fileName = fileName;
+			this.data = data;
+		}
+	}
+
+	private Optional<List<NotificationResponseDTO>> sendEmail(
+			String residentEmailId,
+			TemplateType emailSubject,
+			TemplateType emailBody,
+			Attachment attachment,
+			Map<String, Object> attributes,
+			String templateLang
+	) {
+
+		Optional<List<NotificationResponseDTO>> noResult = Optional.empty();
+		if (residentEmailId == null) {
+			printLogger.error("Resident email ID parameter is null");
+			return noResult;
+		}
+		if (emailSubject == null) {
+			printLogger.error("Email subject parameter is null");
+			return noResult;
+		}
+		if (emailBody == null) {
+			printLogger.error("Email body parameter is null");
+			return noResult;
+		}
+
+		if (attachment != null && (attachment.getFileName() == null || attachment.getData() == null)) {
+			printLogger.error("Both filename and data must be provided for email attachment");
+			return noResult;
+		}
+
+		List<String> emailIds = new ArrayList<>();
+		emailIds.add(residentEmailId);
+		if (defaultEmailIds != null) {
+			emailIds.add(defaultEmailIds);
+		}
+
+		try {
+			List<NotificationResponseDTO> responseDTOs = notificationUtil.emailNotification(
+					emailIds,
+					attachment != null ? attachment.getFileName() : null,
+					emailBody.getValue(),
+					emailSubject.getValue(),
+					attributes,
+					attachment != null ? attachment.getData() : null,
+					templateLang
+			);
+			return Optional.of(responseDTOs);
+		} catch (Exception e) {
+			printLogger.error("Failed to send email to {}: {}", residentEmailId, e.getMessage(), e);
+			return noResult;
+		}
+	}
+
+	private void sendUINInEmail(String residentEmailId, String fileName, Map<String, Object> attributes, byte[] pdfbytes, String templateLang) {
+		if (pdfbytes == null) {
+			return;
+		}
+
+		var responsesDtos = sendEmail(
+				residentEmailId,
+				TemplateType.UIN_CARD_EMAIL_SUB,
+				TemplateType.UIN_CARD_EMAIL,
+				new Attachment(fileName, pdfbytes),
+				attributes,
+				templateLang
+		);
+		responsesDtos.ifPresent(responseDTOs -> {
+			responseDTOs.forEach(responseDTO ->
+					printLogger.info("Email sent successfully, server response: {}", responseDTO)
+			);
+		});
+	}
 	/**
 	 * Creates the text file.
 	 *
@@ -720,6 +775,34 @@ public class PrintServiceImpl implements PrintService{
 		webSubSubscriptionHelper.printStatusUpdateEvent(topic, creEvent);
 	}
 
+	/**
+	 * Processes a template and generates a PDF document.
+	 *
+	 * @param template        the template name
+	 * @param attributes      the template attributes
+	 * @param templateLang    the template language
+	 * @param password        the password for PDF protection (can be null)
+	 * @return                the generated PDF as byte array
+	 * @throws TemplateProcessingFailureException if template processing fails
+	 */
+	private byte[] generatePdfFromTemplate(String template, Map<String, Object> attributes, String templateLang, String password) {
+		try {
+			InputStream uinArtifact = templateGenerator.getTemplate(template, attributes, templateLang);
+			
+			if (uinArtifact == null) {
+				printLogger.error(PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.name());
+				throw new TemplateProcessingFailureException(
+						PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.getCode());
+			}
+			
+			return uinCardGenerator.generateUinCard(uinArtifact, UinCardType.PDF, password);
+		} catch (Exception e) {
+			printLogger.error("Error in template processing or PDF generation", e);
+			throw new TemplateProcessingFailureException(
+					PlatformErrorMessages.PRT_TEM_PROCESSING_FAILURE.getCode());
+		}
+	}
+	
 	public org.json.JSONObject decryptAttribute(org.json.JSONObject data, String encryptionPin, String credential)
 			throws ParseException {
 
