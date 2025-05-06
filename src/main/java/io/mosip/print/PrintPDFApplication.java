@@ -15,36 +15,32 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import io.mosip.print.service.impl.CbeffImpl;
 import io.mosip.print.spi.CbeffUtil;
 
-
-@SpringBootApplication(scanBasePackages = { "io.mosip.print.*", "${mosip.auth.adapter.impl.basepackage}"  }, exclude = { DataSourceAutoConfiguration.class,
-		HibernateJpaAutoConfiguration.class,
-		CacheAutoConfiguration.class })
+@SpringBootApplication(scanBasePackages = { "io.mosip.print.*", "${mosip.auth.adapter.impl.basepackage}" }, 
+    exclude = { DataSourceAutoConfiguration.class, HibernateJpaAutoConfiguration.class, CacheAutoConfiguration.class })
 @EnableScheduling
 @EnableAsync
 public class PrintPDFApplication {
 
-
-	@Bean
-	@Primary
-	public CbeffUtil getCbeffUtil() {
-		return new CbeffImpl();
-	}
+    @Bean
+    @Primary
+    public CbeffUtil getCbeffUtil() {
+        return new CbeffImpl();
+    }
 
 	@Bean
 	public CredentialsVerifier credentialsVerifier() {
 		return new CredentialsVerifier();
 	}
 
-	@Bean
-	public ThreadPoolTaskScheduler taskScheduler() {
-		ThreadPoolTaskScheduler threadPoolTaskScheduler = new ThreadPoolTaskScheduler();
-		threadPoolTaskScheduler.setPoolSize(5);
-		threadPoolTaskScheduler.setThreadNamePrefix("ThreadPoolTaskScheduler");
-		return threadPoolTaskScheduler;
-	}
+    @Bean
+    public ThreadPoolTaskScheduler taskScheduler() {
+        ThreadPoolTaskScheduler threadPoolTaskScheduler = new ThreadPoolTaskScheduler();
+        threadPoolTaskScheduler.setPoolSize(5);
+        threadPoolTaskScheduler.setThreadNamePrefix("ThreadPoolTaskScheduler");
+        return threadPoolTaskScheduler;
+    }
 
-	public static void main(String[] args) {
-		SpringApplication.run(PrintPDFApplication.class, args);
-	}
-
+    public static void main(String[] args) {
+        SpringApplication.run(PrintPDFApplication.class, args);
+    }
 }
